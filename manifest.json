@@ -1,11 +1,11 @@
 {
-    "name": "roamy_clone",
-    "short_name": "roamy_clone",
+    "name": "DRIFT - Smart Travel Itinerary",
+    "short_name": "DRIFT",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Smart travel itinerary app for couples",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
