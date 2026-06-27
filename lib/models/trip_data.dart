@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum TransportMode { flight, bus, boat, train, walk, taxi }
+enum TransportMode { flight, bus, boat, train, walk, taxi, car, tuktuk }
 
 /// A resolved location attached to an activity
 class ActivityLocation {
@@ -207,6 +207,8 @@ IconData getTransportIcon(TransportMode mode) {
     case TransportMode.train: return Icons.train;
     case TransportMode.walk: return Icons.directions_walk;
     case TransportMode.taxi: return Icons.local_taxi;
+    case TransportMode.car: return Icons.directions_car;
+    case TransportMode.tuktuk: return Icons.electric_rickshaw;
   }
 }
 
@@ -218,6 +220,8 @@ Color getTransportColor(TransportMode mode) {
     case TransportMode.train: return const Color(0xFFFF6B6B);
     case TransportMode.walk: return const Color(0xFFFFAB40);
     case TransportMode.taxi: return const Color(0xFF4CAF50);
+    case TransportMode.car: return const Color(0xFF2196F3);
+    case TransportMode.tuktuk: return const Color(0xFFFF9800);
   }
 }
 
@@ -229,5 +233,7 @@ String getTransportLabel(TransportMode mode) {
     case TransportMode.train: return 'Train';
     case TransportMode.walk: return 'Walk';
     case TransportMode.taxi: return 'Taxi';
+    case TransportMode.car: return 'Car';
+    case TransportMode.tuktuk: return 'Tuk Tuk';
   }
 }
