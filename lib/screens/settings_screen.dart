@@ -32,8 +32,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _tripNameController = TextEditingController(text: widget.trip.title);
-    _traveler1Controller = TextEditingController(text: 'Ahmed');
-    _traveler2Controller = TextEditingController(text: 'Wife');
+    _traveler1Controller = TextEditingController(text: '');
+    _traveler2Controller = TextEditingController(text: '');
     _currency = widget.trip.currency;
     _tripType = 'Couple Trip';
     _alertsEnabled = true;
