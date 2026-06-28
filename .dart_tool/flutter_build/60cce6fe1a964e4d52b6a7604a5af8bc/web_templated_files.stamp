@@ -1,0 +1,1 @@
+{"inputs":["/opt/data/drift/web/*/index.html","/opt/data/drift/web/flutter_bootstrap.js","/opt/data/flutter_sdk/bin/cache/engine.stamp"],"outputs":["/opt/data/drift/build/web/*/index.html","/opt/data/drift/build/web/flutter_bootstrap.js"],"buildKey":"[{\"compileTarget\":\"dart2js\",\"renderer\":\"canvaskit\",\"mainJsPath\":\"main.dart.js\"},{}]"}
