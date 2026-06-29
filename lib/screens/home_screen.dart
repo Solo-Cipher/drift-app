@@ -295,7 +295,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         slivers: [
           _buildSliverAppBar(context),
           SliverToBoxAdapter(child: _buildOverviewCards(context)),
-          SliverToBoxAdapter(child: _buildSectionHeader('Itinerary', Icons.map)),
+          SliverToBoxAdapter(child: _buildSectionHeader('Itinerary', Icons.calendar_today)),
           _buildTimeline(context),
           const SliverToBoxAdapter(child: SizedBox(height: 100)),
         ],
@@ -753,8 +753,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               const SizedBox(width: 4),
                               TextButton.icon(
                                 onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DayDetailScreen(day: day, tripTitle: trip.title, currency: trip.currency))),
-                                icon: const Icon(Icons.map, size: 14),
-                                label: Text('Map View', style: GoogleFonts.inter(fontSize: 12)),
+                                icon: const Icon(Icons.open_in_new, size: 14),
+                                label: Text('Details', style: GoogleFonts.inter(fontSize: 12)),
                                 style: TextButton.styleFrom(foregroundColor: const Color(0xFF00BFA6), padding: const EdgeInsets.symmetric(horizontal: 8)),
                               ),
                             ],
