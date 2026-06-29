@@ -113,29 +113,62 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
     return history;
   }
 
-  /// Flight pricing: dynamic from CityConfig
-  Map<String, dynamic> _getFlightPricing() {
+  /// Flight pricing: generates flights to ALL cities in the itinerary
+  /// so users can see various entry point options
+  List<Map<String, dynamic>> _getFlightPricing() {
     final config = _config;
     final fromCode = config?.originAirport ?? 'MCT';
-    final toCode = config?.iataCode ?? (widget.trip.days.isNotEmpty ? widget.trip.days.first.location.substring(0, 3).toUpperCase() : '???');
     final basePrice = config?.flightBasePrice ?? 200.0;
     final seed = widget.trip.baseStartDate.day + widget.trip.baseStartDate.month * 31;
-    final factor = _priceFactor(widget.trip.baseStartDate.day, widget.trip.baseStartDate.month, seed);
-    final current = (basePrice * factor);
-    final avg = basePrice * 1.05;
-    final toLabel = config?.primaryCity ?? 'Destination';
-    return {
-      'current': current,
-      'average': avg,
-      'history': _generatePriceHistory(current, seed),
-      'departureDate': widget.trip.startDate,
-      'from': fromCode,
-      'to': toCode,
-      'label': 'Flights: $fromCode → $toCode',
-      'fromLabel': fromCode,
-      'toLabel': toLabel,
-      'currency': widget.trip.currency,
-    };
+
+    // Collect unique cities from the itinerary
+    final uniqueCities = <String>{};
+    for (final day in widget.trip.days) {
+      uniqueCities.add(day.location);
+    }
+
+    // Map city names to IATA codes (use city name 3-letter code as fallback)
+    final flights = <Map<String, dynamic>>[];
+    int cityIdx = 0;
+    for (final city in uniqueCities) {
+      final cityIata = _cityToIata(city, config);
+      final citySeed = seed + cityIdx * 100;
+      final factor = _priceFactor(widget.trip.baseStartDate.day, widget.trip.baseStartDate.month, citySeed);
+      // Add some price variation per city (±30%)
+      final priceVariation = 0.7 + (cityIdx % 3) * 0.3;
+      final current = basePrice * factor * priceVariation;
+      final avg = basePrice * priceVariation;
+      flights.add({
+        'current': current,
+        'average': avg,
+        'history': _generatePriceHistory(current, citySeed),
+        'departureDate': widget.trip.startDate,
+        'from': fromCode,
+        'to': cityIata,
+        'toCity': city,
+        'label': 'Flights: $fromCode → $cityIata ($city)',
+        'fromLabel': fromCode,
+        'toLabel': city,
+        'currency': widget.trip.currency,
+      });
+      cityIdx++;
+    }
+    return flights;
+  }
+
+  /// Convert a city name to a reasonable IATA code
+  String _cityToIata(String city, CityConfig? config) {
+    // Check cities in config for a match
+    if (config != null) {
+      for (final entry in config.cities.entries) {
+        if (entry.value.displayName.toLowerCase() == city.toLowerCase()) {
+          // Use the key if it looks like an IATA code, else generate one
+          return entry.key.length == 3 ? entry.key.toUpperCase() : entry.value.displayName.substring(0, 3).toUpperCase();
+        }
+      }
+    }
+    // Fallback: first 3 letters of city name
+    return city.length >= 3 ? city.substring(0, 3).toUpperCase() : city.toUpperCase();
   }
 
   /// Dynamic hotel pricing per unique location in trip
@@ -219,7 +252,7 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
     final daysUntil = _daysUntilDeparture();
 
     // Compute all pricing dynamically
-    final flight = _getFlightPricing();
+    final flights = _getFlightPricing();
     final hotels = _getHotelPricings();
     final activities = _getActivityPricings();
 
@@ -252,7 +285,7 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
         ),
         body: TabBarView(
           children: [
-            _buildFlightsAndCarsTab(flight, daysUntil),
+            _buildFlightsAndCarsTab(flights, daysUntil),
             _buildHotelsTab(hotels),
             _buildRecommendedAppsTab(),
             _buildWeatherTab(),
@@ -398,7 +431,7 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
 
   // ─── Tab Builders ────────────────────────────────────────────────────
 
-  Widget _buildFlightsAndCarsTab(Map<String, dynamic> flight, int daysUntil) {
+  Widget _buildFlightsAndCarsTab(List<Map<String, dynamic>> flights, int daysUntil) {
     final config = _config;
     final primaryCity = config?.primaryCity ?? (widget.trip.days.isNotEmpty ? widget.trip.days.first.location : 'City');
     final travelDays = widget.trip.days.where((d) => d.isTravelDay).toList();
@@ -412,10 +445,10 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
         const SizedBox(height: 16),
         _buildDepartureCountdown(daysUntil),
         const SizedBox(height: 16),
-        // Flight pricing
-        _buildSectionHeader('✈️ Flights', '${flight['fromLabel']} → ${flight['toLabel']}'),
+        // Flight pricing — show all destination cities
+        _buildSectionHeader('�️ Flights', 'All destinations in your itinerary'),
         const SizedBox(height: 8),
-        _buildPriceAlertCard(
+        ...flights.map((flight) => _buildPriceAlertCard(
           title: flight['label'] as String,
           currentPrice: '${(flight['current'] as double).toStringAsFixed(0)} ${flight['currency']}',
           averagePrice: '${(flight['average'] as double).toStringAsFixed(0)} ${flight['currency']}',
@@ -424,7 +457,7 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
           priceHistory: flight['history'] as List<double>,
           purchaseUrl: _skyscannerUrl(flight['from'] as String, flight['to'] as String, flight['departureDate'] as String),
           purchaseLabel: 'Search on Skyscanner',
-        ),
+        )),
         const SizedBox(height: 16),
         // Car rental
         _buildSectionHeader('� Rental Cars', 'Compare providers in $primaryCity'),
@@ -527,33 +560,22 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
   }
 
   Widget _buildRecommendedAppsTab() {
-    final apps = [
-      {'name': 'Grab', 'category': 'Ride Hailing & Food', 'description': '#1 ride app in Vietnam. Book motorbike taxis, cars, order food delivery. Works in all major cities.', 'url': 'https://www.grab.com/vn/', 'icon': Icons.local_taxi, 'color': const Color(0xFF00B14F)},
-      {'name': 'Be', 'category': 'Ride Hailing', 'description': 'Grab competitor with good motorbike taxi rates in Hanoi and HCMC.', 'url': 'https://be.com.vn/', 'icon': Icons.motorcycle, 'color': const Color(0xFFE53935)},
-      {'name': 'Gojek (GoViet)', 'category': 'Ride Hailing', 'description': 'Another ride option with competitive pricing. Download locally.', 'url': 'https://www.gojek.com/', 'icon': Icons.directions_bike, 'color': const Color(0xFF00AA13)},
-      {'name': 'Vietnam Airlines', 'category': 'Domestic Flights', 'description': 'Flag carrier for domestic routes HCMC-Phu Quoc. Book early for best rates.', 'url': 'https://www.vietnamairlines.com/', 'icon': Icons.flight, 'color': const Color(0xFF0066B3)},
-      {'name': 'Bamboo Airways', 'category': 'Domestic Flights', 'description': 'Low-cost domestic carrier with good HCMC-Phu Quoc route coverage.', 'url': 'https://bambooairways.com/', 'icon': Icons.flight_takeoff, 'color': const Color(0xFF8BC34A)},
-      {'name': 'Vexere', 'category': 'Bus Tickets', 'description': 'Book long-distance buses online. Useful for overland travel between cities.', 'url': 'https://vexere.com/', 'icon': Icons.directions_bus, 'color': const Color(0xFFFF9800)},
-      {'name': 'Phương Trang (Futa Bus)', 'category': 'Bus Tickets', 'description': 'Major bus operator with online booking for intercity routes.', 'url': 'https://futabus.vn/', 'icon': Icons.bus_alert, 'color': const Color(0xFFFF5722)},
-      {'name': '12Go Asia', 'category': 'Transport Booking', 'description': 'Book trains, buses, ferries across Vietnam in one app. Good for comparing options.', 'url': 'https://12go.asia/en/vietnam', 'icon': Icons.train, 'color': const Color(0xFF3F51B5)},
-      {'name': 'MoMo', 'category': 'Payment & Wallet', 'description': 'Vietnam\'s top e-wallet. Pay at many shops, restaurants. Tourist-friendly.', 'url': 'https://momo.vn/', 'icon': Icons.account_balance_wallet, 'color': const Color(0xFFA83279)},
-      {'name': 'Google Translate', 'category': 'Language', 'description': 'Download Vietnamese offline pack. Camera translate for menus/signs.', 'url': 'https://translate.google.com/', 'icon': Icons.translate, 'color': const Color(0xFF4285F4)},
-      {'name': 'XE Currency', 'category': 'Currency', 'description': 'Real-time OMR to VND rates. Helpful for quick mental math while shopping.', 'url': 'https://www.xe.com/', 'icon': Icons.attach_money, 'color': const Color(0xFF00BFA6)},
-      {'name': 'Google Maps', 'category': 'Navigation', 'description': 'Works offline — download Hanoi and HCMC maps. Walking directions are reliable.', 'url': 'https://maps.google.com/', 'icon': Icons.map, 'color': const Color(0xFF34A853)},
-    ];
+    final config = _config;
+    final countryName = config?.country ?? 'Your Destination';
+    final apps = config?.recommendedApps ?? [];
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _buildSectionHeader('� Recommended Apps for Vietnam', 'Download before your trip'),
+        _buildSectionHeader('� Recommended Apps for $countryName', 'Download before your trip'),
         const SizedBox(height: 12),
         ...apps.map((app) => _buildAppCard(
-          name: app['name'] as String,
-          category: app['category'] as String,
-          description: app['description'] as String,
-          url: app['url'] as String,
-          icon: app['icon'] as IconData,
-          color: app['color'] as Color,
+          name: app.name,
+          category: app.category,
+          description: app.description,
+          url: app.url,
+          icon: parseIcon(app.iconName),
+          color: Color(app.colorValue),
         )),
         const SizedBox(height: 40),
       ],
@@ -561,95 +583,95 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
   }
 
   Widget _buildWeatherTab() {
+    final config = _config;
+    final profiles = config?.weatherProfiles ?? [];
+    final countryName = config?.country ?? 'Your Destination';
+
+    // Map severity string to WeatherStatus
+    WeatherStatus _statusFromSeverity(String s) {
+      switch (s.toLowerCase()) {
+        case 'warning': return WeatherStatus.warning;
+        case 'caution': return WeatherStatus.caution;
+        default: return WeatherStatus.good;
+      }
+    }
+
+    // Map severity string to icon
+    IconData _iconFromSeverity(String s) {
+      switch (s.toLowerCase()) {
+        case 'warning': return Icons.umbrella;
+        case 'caution': return Icons.cloud;
+        default: return Icons.wb_sunny;
+      }
+    }
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _buildSectionHeader('🌤️ Weather Warnings', 'Only alerts for severe conditions'),
+        _buildSectionHeader('🌤️ Weather for $countryName', 'Alerts for severe conditions'),
         const SizedBox(height: 12),
-        _buildWeatherCard(
-          location: 'Hanoi',
-          date: _formatDateRange(
-            widget.trip.days.first.date,
-            widget.trip.days[2].date,
+        ...profiles.map((p) {
+          // Find approximate date for this location from the itinerary
+          final dayMatch = widget.trip.days.firstWhere(
+            (d) => d.location.toLowerCase().contains(p.location.toLowerCase().split(' ')[0]),
+            orElse: () => widget.trip.days.first,
+          );
+          return _buildWeatherCard(
+            location: p.location,
+            date: dayMatch.date,
+            status: _statusFromSeverity(p.severity),
+            detail: p.detail,
+            icon: _iconFromSeverity(p.severity),
+          );
+        }),
+        if (profiles.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(24),
+            child: Text('No weather alerts for this destination.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
           ),
-          status: WeatherStatus.good,
-          detail: 'October: Cool and dry. Avg 22°C. Great for sightseeing.',
-          icon: Icons.wb_sunny,
-        ),
-        _buildWeatherCard(
-          location: 'Ha Long Bay',
-          date: widget.trip.days.length > 3 ? widget.trip.days[3].date : 'Day 4',
-          status: WeatherStatus.caution,
-          detail: 'Light rain possible. Bring a rain jacket for the cruise.',
-          icon: Icons.cloud_queue,
-        ),
-        _buildWeatherCard(
-          location: 'Ho Chi Minh City',
-          date: _formatDateRange(
-            widget.trip.days.length > 5 ? widget.trip.days[5].date : 'Day 6',
-            widget.trip.days.length > 9 ? widget.trip.days[9].date : 'Day 10',
-          ),
-          status: WeatherStatus.warning,
-          detail: 'Heavy afternoon showers expected (2-4pm daily). Plan indoor activities during these hours.',
-          icon: Icons.umbrella,
-        ),
         const SizedBox(height: 40),
       ],
     );
   }
 
   Widget _buildScheduleTab(List<Map<String, dynamic>> activities) {
-    final cuChi = activities.isNotEmpty ? activities[0] : null;
-    final mekong = activities.length > 1 ? activities[1] : null;
+    final config = _config;
+    final countryName = config?.country ?? widget.trip.days.first.country;
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _buildSectionHeader('📅 Schedule Checks', 'Closed days & timing conflicts'),
+        _buildSectionHeader('📅 Schedule Checks', 'Timing reminders for your itinerary'),
         const SizedBox(height: 12),
-        _buildClosureCard(
-          venue: 'Ho Chi Minh Mausoleum',
-          plannedDay: 'Day 3 (${widget.trip.days.length > 2 ? widget.trip.days[2].date : "Day 3"})',
-          issue: _checkMausoleumClosure(widget.trip.days.length > 2 ? widget.trip.days[2].date : ""),
-          status: _getMausoleumStatus(widget.trip.days.length > 2 ? widget.trip.days[2].date : ""),
-        ),
-        _buildClosureCard(
-          venue: 'War Remnants Museum',
-          plannedDay: 'Day 6 (${widget.trip.days.length > 5 ? widget.trip.days[5].date : "Day 6"})',
-          issue: 'Open daily 7:30am-6pm. No conflict.',
-          status: ClosureStatus.ok,
-        ),
-        _buildClosureCard(
-          venue: 'Cu Chi Tunnels',
-          plannedDay: 'Day 7 (${widget.trip.days.length > 6 ? widget.trip.days[6].date : "Day 7"})',
-          issue: 'Open daily. Morning visit recommended to avoid crowds.',
-          status: ClosureStatus.ok,
-        ),
+        // Generate a notice for each day that has activities
+        ...widget.trip.days.map((day) {
+          final dayActivities = day.activities.join(', ');
+          if (dayActivities.isEmpty) return const SizedBox.shrink();
+          return _buildClosureCard(
+            venue: day.title,
+            plannedDay: 'Day ${day.day} (${day.date})',
+            issue: dayActivities.length > 60
+                ? '${dayActivities.substring(0, 57)}...'
+                : dayActivities,
+            status: ClosureStatus.info,
+          );
+        }),
         const SizedBox(height: 24),
-        // Activities section
-        _buildSectionHeader('� Tours & Activities', 'Popular add-ons'),
-        const SizedBox(height: 12),
-        if (cuChi != null)
-          _buildPriceAlertCard(
-            title: cuChi['label'] ?? 'Cu Chi Tunnels Tour',
-            currentPrice: '${(cuChi['current'] as double).toStringAsFixed(0)} ${cuChi['currency']}/person',
-            averagePrice: '${(cuChi['average'] as double).toStringAsFixed(0)} ${cuChi['currency']}/person',
-            trend: _trend(cuChi['current'] as double, cuChi['average'] as double),
-            detail: _buildPriceInsight(cuChi['current'] as double, cuChi['average'] as double, 'activity'),
-            priceHistory: cuChi['history'] as List<double>,
-            purchaseUrl: _bookingUrl('Ho+Chi+Minh+City', cuChi['date'] as String, cuChi['date'] as String),
-            purchaseLabel: 'Search Tours',
-          ),
-        if (mekong != null)
-          _buildPriceAlertCard(
-            title: mekong['label'] ?? 'Mekong Delta Tour',
-            currentPrice: '${(mekong['current'] as double).toStringAsFixed(0)} ${mekong['currency']}/person',
-            averagePrice: '${(mekong['average'] as double).toStringAsFixed(0)} ${mekong['currency']}/person',
-            trend: _trend(mekong['current'] as double, mekong['average'] as double),
-            detail: _buildPriceInsight(mekong['current'] as double, mekong['average'] as double, 'activity'),
-            priceHistory: mekong['history'] as List<double>,
-            purchaseUrl: _bookingUrl('Ho+Chi+Minh+City', mekong['date'] as String, mekong['date'] as String),
-            purchaseLabel: 'Search Tours',
-          ),
+        // Activities pricing section (if activities found)
+        if (activities.isNotEmpty) ...[
+          _buildSectionHeader('🎟 Tours & Activities', 'Pricing based on your destinations'),
+          const SizedBox(height: 12),
+          ...activities.map((a) => _buildPriceAlertCard(
+            title: a['label'] ?? 'Activity',
+            currentPrice: '${(a['current'] as double).toStringAsFixed(0)} ${a['currency']}/person',
+            averagePrice: '${(a['average'] as double).toStringAsFixed(0)} ${a['currency']}/person',
+            trend: _trend(a['current'] as double, a['average'] as double),
+            detail: _buildPriceInsight(a['current'] as double, a['average'] as double, 'activity'),
+            priceHistory: a['history'] as List<double>,
+            purchaseUrl: _bookingUrl(countryName.replaceAll(' ', '+'), a['date'] as String, a['date'] as String),
+            purchaseLabel: 'Search',
+          )),
+        ],
         const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(12),
@@ -973,14 +995,18 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
   }) {
     final color = status == ClosureStatus.ok
         ? const Color(0xFF00BFA6)
-        : status == ClosureStatus.warning
-            ? const Color(0xFFFFAB40)
-            : const Color(0xFFFF6B6B);
+        : status == ClosureStatus.info
+            ? const Color(0xFF6C63FF)
+            : status == ClosureStatus.warning
+                ? const Color(0xFFFFAB40)
+                : const Color(0xFFFF6B6B);
     final icon = status == ClosureStatus.ok
         ? Icons.check_circle
-        : status == ClosureStatus.warning
-            ? Icons.warning
-            : Icons.error;
+        : status == ClosureStatus.info
+            ? Icons.info_outline
+            : status == ClosureStatus.warning
+                ? Icons.warning
+                : Icons.error;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -1011,28 +1037,13 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
     );
   }
 
-  /// Check if the mausoleum visit day falls on Monday or Friday
-  String _checkMausoleumClosure(String dateStr) {
-    final date = _parseDate(dateStr);
-    final weekday = date.weekday;
-    if (weekday == 1) return '⚠️ ${dateStr} is a Monday — Mausoleum is CLOSED. Reschedule to another day.';
-    if (weekday == 5) return '⚠️ ${dateStr} is a Friday — Mausoleum is CLOSED. Reschedule to another day.';
-    final dayNames = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    return '${dateStr} is a ${dayNames[weekday]} — Mausoleum is open!';
-  }
-
-  ClosureStatus _getMausoleumStatus(String dateStr) {
-    final date = _parseDate(dateStr);
-    if (date.weekday == 1 || date.weekday == 5) return ClosureStatus.closed;
-    return ClosureStatus.ok;
-  }
 }
 
 // ─── Enums ─────────────────────────────────────────────────────────────
 
 enum PriceTrend { below, above, average }
 enum WeatherStatus { good, caution, warning }
-enum ClosureStatus { ok, warning, closed }
+enum ClosureStatus { ok, info, warning, closed }
 
 // ─── Custom Painter for Price Trends ────────────────────────────────────
 
