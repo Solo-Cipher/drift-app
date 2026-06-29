@@ -1,12 +1,9 @@
-import 'dart:html' as html;
-import 'dart:ui_web' as ui_web;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/trip_data.dart';
 import '../data/vietnam_trip.dart';
 import '../services/closure_checker.dart';
-import '../widgets/location_autocomplete_field.dart';
 import '../screens/day_detail_screen.dart';
 import '../screens/cost_screen.dart';
 import '../screens/trip_editor_screen.dart';
@@ -450,7 +447,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
     final total = totalTransport + totalAccommodation + totalFood;
     final perPerson = total > 0 ? total / 2 : 0;
-    final totalActivities = trip.days.fold(0, (sum, d) => sum + d.activities.length);
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -509,71 +505,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: _buildInfoTile(icon: Icons.local_activity, value: '$totalActivities', label: 'Activities', color: const Color(0xFF00BFA6))),
-              const SizedBox(width: 10),
               Expanded(child: _buildInfoTile(icon: Icons.directions, value: '${trip.days.where((d) => d.isTravelDay).length}', label: 'Travel Days', color: const Color(0xFFFFAB40))),
-              const SizedBox(width: 10),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => _showNotificationSheet(context),
-                  child: Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: _notifications.any((n) => n.risk == ClosureRisk.closed)
-                            ? const Color(0xFFFF6B6B).withOpacity(0.3)
-                            : _notifications.any((n) => n.risk == ClosureRisk.warning)
-                                ? const Color(0xFFFFAB40).withOpacity(0.3)
-                                : const Color(0xFFEEEEEE),
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: _notifications.any((n) => n.risk == ClosureRisk.closed)
-                                ? const Color(0xFFFF6B6B).withOpacity(0.1)
-                                : _notifications.any((n) => n.risk == ClosureRisk.warning)
-                                    ? const Color(0xFFFFAB40).withOpacity(0.1)
-                                    : const Color(0xFF6C63FF).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(
-                            _notifications.any((n) => n.risk == ClosureRisk.closed)
-                                ? Icons.error_outline
-                                : _notifications.any((n) => n.risk == ClosureRisk.warning)
-                                    ? Icons.warning_amber_outlined
-                                    : Icons.notifications_outlined,
-                            size: 20,
-                            color: _notifications.any((n) => n.risk == ClosureRisk.closed)
-                                ? const Color(0xFFFF6B6B)
-                                : _notifications.any((n) => n.risk == ClosureRisk.warning)
-                                    ? const Color(0xFFFFAB40)
-                                    : const Color(0xFF6C63FF),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          _notifications.isEmpty ? 'All Clear' : '${_notifications.length} Alert${_notifications.length > 1 ? 's' : ''}',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: _notifications.any((n) => n.risk == ClosureRisk.closed)
-                                ? const Color(0xFFFF6B6B)
-                                : _notifications.any((n) => n.risk == ClosureRisk.warning)
-                                    ? const Color(0xFFFFAB40)
-                                    : const Color(0xFF6C63FF),
-                          ),
-                        ),
-                        Text('Schedule', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF888888))),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
         ],
@@ -794,8 +726,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   Text('+${day.activities.length - 3} more', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF6C63FF), fontWeight: FontWeight.w600)),
                               ],
 
-                              // Inline map preview showing day's locations
-                              _buildInlineMapPreview(day),
+
                             ],
                           ),
                         ),
@@ -872,18 +803,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   child: Row(
                                     children: [
                                       Expanded(
-                                        child: LocationAutocompleteField(
-                                          initialValue: entry.value.text,
-                                          dense: true,
-                                          onLocationSelected: (loc) {
-                                            setState(() {
-                                              if (actIndex < _activityLocations.length) {
-                                                _activityLocations[actIndex] = loc;
-                                              }
-                                            });
-                                          },
-                                          onChanged: (v) => entry.value.text = v,
-                                          currentLocation: actIndex < _activityLocations.length ? _activityLocations[actIndex] : null,
+                                        child: TextField(
+                                          controller: entry.value,
+                                          decoration: InputDecoration(
+                                            isDense: true,
+                                            hintText: 'Activity name',
+                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFEEEEEE))),
+                                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                            suffixIcon: actIndex < _activityLocations.length && _activityLocations[actIndex] != null
+                                                ? const Icon(Icons.location_on, size: 14, color: Color(0xFF6C63FF))
+                                                : null,
+                                          ),
+                                          style: GoogleFonts.inter(fontSize: 13),
                                         ),
                                       ),
                                       IconButton(
@@ -958,111 +889,4 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  /// Build inline map preview for a day card
-  Widget _buildInlineMapPreview(TripDay day) {
-    final pins = day.allPins;
-    if (pins.isEmpty) return const SizedBox.shrink();
-
-    // Register the iframe view factory for this day
-    final iframeId = 'inline-map-day-${day.day}';
-    // ignore: undefined_prefixed_name
-    ui_web.platformViewRegistry.registerViewFactory(
-      iframeId,
-      (int viewId) {
-        double minLat = pins.first.lat, maxLat = pins.first.lat;
-        double minLng = pins.first.lng, maxLng = pins.first.lng;
-        for (final p in pins) {
-          if (p.lat < minLat) minLat = p.lat;
-          if (p.lat > maxLat) maxLat = p.lat;
-          if (p.lng < minLng) minLng = p.lng;
-          if (p.lng > maxLng) maxLng = p.lng;
-        }
-        final bboxPadding = 0.02;
-        final bbox = '${minLng - bboxPadding}%2C${minLat - bboxPadding}%2C${maxLng + bboxPadding}%2C${maxLat + bboxPadding}';
-        final markers = pins.map((p) => 'marker=${p.lat}%2C${p.lng}').join('&');
-        final iframe = html.IFrameElement()
-          ..style.border = 'none'
-          ..style.width = '100%'
-          ..style.height = '100%'
-          ..src = 'https://www.openstreetmap.org/export/embed.html?bbox=$bbox&layer=mapnik&$markers';
-        return iframe;
-      },
-    );
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      height: 180,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEEEEEE)),
-        color: const Color(0xFFE8EAF6),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
-        children: [
-          HtmlElementView(viewType: iframeId),
-          // Pin count badge overlay
-          Positioned(
-            top: 8,
-            left: 8,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.95),
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 6, offset: const Offset(0, 1))],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.location_on, size: 12, color: day.color),
-                  const SizedBox(width: 4),
-                  Text(
-                    pins.length == 1 ? '${pins.first.name}' : '${pins.length} places',
-                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF1A1A2E)),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          // Open in maps button
-          Positioned(
-            bottom: 8,
-            right: 8,
-            child: GestureDetector(
-              onTap: () async {
-                String url;
-                if (pins.length == 1) {
-                  url = 'https://www.google.com/maps/search/?api=1&query=${pins.first.lat},${pins.first.lng}';
-                } else {
-                  final center = pins.first;
-                  final waypoints = pins.skip(1).map((p) => '${p.lat},${p.lng}').join('|');
-                  url = 'https://www.google.com/maps/dir/${center.lat},${center.lng}/$waypoints';
-                }
-                if (await canLaunchUrl(Uri.parse(url))) {
-                  await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-                }
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.95),
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 6, offset: const Offset(0, 1))],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.open_in_new, size: 14, color: day.color),
-                    const SizedBox(width: 4),
-                    Text('Open Map', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: day.color)),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

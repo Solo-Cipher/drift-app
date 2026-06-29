@@ -221,173 +221,42 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
     final cuChi = _getCuChiPricing();
     final mekong = _getMekongPricing();
 
-    // Determine price trends
-    PriceTrend _trend(double current, double avg) {
-      if (current < avg * 0.95) return PriceTrend.below;
-      if (current > avg * 1.05) return PriceTrend.above;
-      return PriceTrend.average;
-    }
-
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FE),
-      appBar: AppBar(
-        title: Text('Smart Alerts', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        surfaceTintColor: Colors.transparent,
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // Trip dates context header
-          _buildTripContextHeader(trip, daysUntil),
-          const SizedBox(height: 20),
-
-          // ── Price Alerts Section ──
-          _buildSectionHeader('💰 Price Alerts', 'Dynamic prices based on your travel dates'),
-          const SizedBox(height: 4),
-          _buildDepartureCountdown(daysUntil),
-          const SizedBox(height: 12),
-          _buildPriceAlertCard(
-            title: flight['label'],
-            currentPrice: '${flight['current'].toStringAsFixed(0)} OMR',
-            averagePrice: '${flight['average'].toStringAsFixed(0)} OMR',
-            trend: _trend(flight['current'], flight['average']),
-            detail: _buildPriceInsight(flight['current'], flight['average'], 'flight'),
-            priceHistory: flight['history'] as List<double>,
-            purchaseUrl: _skyscannerUrl(flight['from'], flight['to'], flight['departureDate']),
-            purchaseLabel: 'Search on Skyscanner',
+    return DefaultTabController(
+      length: 5,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8F9FE),
+        appBar: AppBar(
+          title: Text('Smart Alerts', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+          backgroundColor: Colors.white,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
+          bottom: TabBar(
+            isScrollable: true,
+            labelColor: const Color(0xFF6C63FF),
+            unselectedLabelColor: const Color(0xFF888888),
+            indicatorColor: const Color(0xFF6C63FF),
+            labelStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700),
+            unselectedLabelStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            tabs: const [
+              Tab(text: '✈️ Flights & Cars'),
+              Tab(text: '🏨 Hotels & Airbnb'),
+              Tab(text: '📱 Apps'),
+              Tab(text: '�️ Weather'),
+              Tab(text: '📅 Schedule'),
+            ],
           ),
-          _buildPriceAlertCard(
-            title: hanoiHotel['label'],
-            currentPrice: '${hanoiHotel['current'].toStringAsFixed(0)} OMR/night',
-            averagePrice: '${hanoiHotel['average'].toStringAsFixed(0)} OMR/night',
-            trend: _trend(hanoiHotel['current'], hanoiHotel['average']),
-            detail: _buildPriceInsight(hanoiHotel['current'], hanoiHotel['average'], 'hotel'),
-            priceHistory: hanoiHotel['history'] as List<double>,
-            purchaseUrl: _bookingUrl(hanoiHotel['city'], hanoiHotel['checkIn'], hanoiHotel['checkOut']),
-            purchaseLabel: 'Search on Booking.com',
-          ),
-          _buildPriceAlertCard(
-            title: hcmcHotel['label'],
-            currentPrice: '${hcmcHotel['current'].toStringAsFixed(0)} OMR/night',
-            averagePrice: '${hcmcHotel['average'].toStringAsFixed(0)} OMR/night',
-            trend: _trend(hcmcHotel['current'], hcmcHotel['average']),
-            detail: _buildPriceInsight(hcmcHotel['current'], hcmcHotel['average'], 'hotel'),
-            priceHistory: hcmcHotel['history'] as List<double>,
-            purchaseUrl: _agodaUrl(hcmcHotel['city'], hcmcHotel['checkIn'], hcmcHotel['checkOut']),
-            purchaseLabel: 'Search on Agoda',
-          ),
-          _buildPriceAlertCard(
-            title: cruise['label'],
-            currentPrice: '${cruise['current'].toStringAsFixed(0)} OMR/person',
-            averagePrice: '${cruise['average'].toStringAsFixed(0)} OMR/person',
-            trend: _trend(cruise['current'], cruise['average']),
-            detail: _buildPriceInsight(cruise['current'], cruise['average'], 'activity'),
-            priceHistory: cruise['history'] as List<double>,
-            purchaseUrl: _bookingUrl('Ha+Long+Bay', cruise['date'], cruise['date']),
-            purchaseLabel: 'Search Cruises',
-          ),
-          _buildPriceAlertCard(
-            title: cuChi['label'],
-            currentPrice: '${cuChi['current'].toStringAsFixed(0)} OMR/person',
-            averagePrice: '${cuChi['average'].toStringAsFixed(0)} OMR/person',
-            trend: _trend(cuChi['current'], cuChi['average']),
-            detail: _buildPriceInsight(cuChi['current'], cuChi['average'], 'activity'),
-            priceHistory: cuChi['history'] as List<double>,
-            purchaseUrl: _bookingUrl('Ho+Chi+Minh+City', cuChi['date'], cuChi['date']),
-            purchaseLabel: 'Search Tours',
-          ),
-          _buildPriceAlertCard(
-            title: mekong['label'],
-            currentPrice: '${mekong['current'].toStringAsFixed(0)} OMR/person',
-            averagePrice: '${mekong['average'].toStringAsFixed(0)} OMR/person',
-            trend: _trend(mekong['current'], mekong['average']),
-            detail: _buildPriceInsight(mekong['current'], mekong['average'], 'activity'),
-            priceHistory: mekong['history'] as List<double>,
-            purchaseUrl: _bookingUrl('Ho+Chi+Minh+City', mekong['date'], mekong['date']),
-            purchaseLabel: 'Search Tours',
-          ),
-
-          const SizedBox(height: 24),
-
-          // ── Weather Section ──
-          _buildSectionHeader('🌤️ Weather Warnings', 'Only alerts for severe conditions'),
-          _buildWeatherCard(
-            location: 'Hanoi',
-            date: _formatDateRange(
-              widget.trip.days.first.date,
-              widget.trip.days[2].date,
-            ),
-            status: WeatherStatus.good,
-            detail: 'October: Cool and dry. Avg 22°C. Great for sightseeing.',
-            icon: Icons.wb_sunny,
-          ),
-          _buildWeatherCard(
-            location: 'Ha Long Bay',
-            date: widget.trip.days.length > 3 ? widget.trip.days[3].date : 'Day 4',
-            status: WeatherStatus.caution,
-            detail: 'Light rain possible. Bring a rain jacket for the cruise.',
-            icon: Icons.cloud_queue,
-          ),
-          _buildWeatherCard(
-            location: 'Ho Chi Minh City',
-            date: _formatDateRange(
-              widget.trip.days.length > 5 ? widget.trip.days[5].date : 'Day 6',
-              widget.trip.days.length > 9 ? widget.trip.days[9].date : 'Day 10',
-            ),
-            status: WeatherStatus.warning,
-            detail: 'Heavy afternoon showers expected (2-4pm daily). Plan indoor activities during these hours.',
-            icon: Icons.umbrella,
-          ),
-
-          const SizedBox(height: 24),
-
-          // ── Schedule Checks Section ──
-          _buildSectionHeader('📅 Schedule Checks', 'Closed days & timing conflicts'),
-          _buildClosureCard(
-            venue: 'Ho Chi Minh Mausoleum',
-            plannedDay: 'Day 3 (${widget.trip.days.length > 2 ? widget.trip.days[2].date : "Day 3"})',
-            issue: _checkMausoleumClosure(widget.trip.days.length > 2 ? widget.trip.days[2].date : ""),
-            status: _getMausoleumStatus(widget.trip.days.length > 2 ? widget.trip.days[2].date : ""),
-          ),
-          _buildClosureCard(
-            venue: 'War Remnants Museum',
-            plannedDay: 'Day 6 (${widget.trip.days.length > 5 ? widget.trip.days[5].date : "Day 6"})',
-            issue: 'Open daily 7:30am-6pm. No conflict.',
-            status: ClosureStatus.ok,
-          ),
-          _buildClosureCard(
-            venue: 'Cu Chi Tunnels',
-            plannedDay: 'Day 7 (${widget.trip.days.length > 6 ? widget.trip.days[6].date : "Day 7"})',
-            issue: 'Open daily. Morning visit recommended to avoid crowds.',
-            status: ClosureStatus.ok,
-          ),
-
-          const SizedBox(height: 16),
-          // Privacy note
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF6C63FF).withOpacity(0.05),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.privacy_tip_outlined, size: 16, color: Color(0xFF6C63FF)),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'All booking links use clean search URLs — no affiliate tracking, no cookies that raise prices. Prices shown are estimates based on historical trends and will update dynamically if you change your trip dates.',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF666666)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 40),
-        ],
+        ),
+        body: TabBarView(
+          children: [
+            _buildFlightsAndCarsTab(flight, daysUntil),
+            _buildHotelsTab(hanoiHotel, hcmcHotel, cruise),
+            _buildRecommendedAppsTab(),
+            _buildWeatherTab(),
+            _buildScheduleTab(cuChi, mekong),
+          ],
+        ),
       ),
     );
   }
@@ -495,6 +364,422 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
     // activity
     if (cheaper) return '$diffStr% below average. Good time to pre-book!';
     return '$diffStr% above average. Book closer to date for potential drops.';
+  }
+
+  // ─── URL Builders ─────────────────────────────────────────────────────
+
+  String _sixtUrl(String city, String pickupDate, String returnDate) {
+    final ci = _parseDate(pickupDate);
+    final co = _parseDate(returnDate);
+    return 'https://www.sixt.com/car-rental/$city?currency=OMR&pickupDate=${ci.year}-${ci.month.toString().padLeft(2, '0')}-${ci.day.toString().padLeft(2, '0')}&pickupTime=10%3A00&returnDate=${co.year}-${co.month.toString().padLeft(2, '0')}-${co.day.toString().padLeft(2, '0')}&returnTime=10%3A00&adults=2';
+  }
+
+  String _enterpriseUrl(String city, String pickupDate, String returnDate) {
+    final ci = _parseDate(pickupDate);
+    final co = _parseDate(returnDate);
+    return 'https://www.enterprise.com/en/car-rental/locations/vn/$city.html?start=${ci.year}${ci.month.toString().padLeft(2, '0')}${ci.day.toString().padLeft(2, '0')}&end=${co.year}${co.month.toString().padLeft(2, '0')}${co.day.toString().padLeft(2, '0')}';
+  }
+
+  String _airbnbUrl(String city, String checkIn, String checkOut) {
+    final ci = _parseDate(checkIn);
+    final co = _parseDate(checkOut);
+    return 'https://www.airbnb.com/s/$city/homes?checkin=${ci.year}-${ci.month.toString().padLeft(2, '0')}-${ci.day.toString().padLeft(2, '0')}&checkout=${co.year}-${co.month.toString().padLeft(2, '0')}-${co.day.toString().padLeft(2, '0')}&adults=2';
+  }
+
+  // ─── Price Trend ───────────────────────────────────────────────────
+
+  PriceTrend _trend(double current, double avg) {
+    if (current < avg * 0.95) return PriceTrend.below;
+    if (current > avg * 1.05) return PriceTrend.above;
+    return PriceTrend.average;
+  }
+
+  // ─── Tab Builders ────────────────────────────────────────────────────
+
+  Widget _buildFlightsAndCarsTab(Map<String, dynamic> flight, int daysUntil) {
+    final hanoiDays = widget.trip.days.where((d) => d.location.contains('Hanoi') && !d.location.contains('Ha Long'));
+    final hanoiStart = hanoiDays.isNotEmpty ? hanoiDays.first.date : widget.trip.startDate;
+    final hanoiEnd = hanoiDays.isNotEmpty ? hanoiDays.last.date : widget.trip.days[2].date;
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _buildTripContextHeader(widget.trip, daysUntil),
+        const SizedBox(height: 16),
+        _buildDepartureCountdown(daysUntil),
+        const SizedBox(height: 16),
+        // Flight pricing
+        _buildSectionHeader('✈️ Flights', 'Muscat → Hanoi'),
+        const SizedBox(height: 8),
+        _buildPriceAlertCard(
+          title: flight['label'],
+          currentPrice: '${flight['current'].toStringAsFixed(0)} OMR',
+          averagePrice: '${flight['average'].toStringAsFixed(0)} OMR',
+          trend: _trend(flight['current'], flight['average']),
+          detail: _buildPriceInsight(flight['current'], flight['average'], 'flight'),
+          priceHistory: flight['history'] as List<double>,
+          purchaseUrl: _skyscannerUrl(flight['from'], flight['to'], flight['departureDate']),
+          purchaseLabel: 'Search on Skyscanner',
+        ),
+        const SizedBox(height: 16),
+        // Car rental
+        _buildSectionHeader('🚗 Rental Cars in Hanoi', 'Compare prices across providers'),
+        const SizedBox(height: 8),
+        _buildRentalCard(
+          provider: 'Sixt',
+          description: 'Wide range of vehicles including sedans and SUVs',
+          url: _sixtUrl('hanoi', hanoiStart, hanoiEnd),
+          color: const Color(0xFFE53935),
+          icon: Icons.directions_car,
+        ),
+        _buildRentalCard(
+          provider: 'Enterprise',
+          description: 'Reliable service with airport pickup available',
+          url: _enterpriseUrl('hanoi', hanoiStart, hanoiEnd),
+          color: const Color(0xFF43A047),
+          icon: Icons.business,
+        ),
+        const SizedBox(height: 40),
+      ],
+    );
+  }
+
+  Widget _buildHotelsTab(Map<String, dynamic> hanoiHotel, Map<String, dynamic> hcmcHotel, Map<String, dynamic> cruise) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _buildSectionHeader('🏨 Hotels & Airbnb', 'Compare across Booking, Agoda & Airbnb'),
+        const SizedBox(height: 12),
+        // Hanoi hotels
+        _buildPriceAlertCard(
+          title: 'Hotels: Hanoi Old Quarter',
+          currentPrice: '${hanoiHotel['current'].toStringAsFixed(0)} OMR/night',
+          averagePrice: '${hanoiHotel['average'].toStringAsFixed(0)} OMR/night',
+          trend: _trend(hanoiHotel['current'], hanoiHotel['average']),
+          detail: _buildPriceInsight(hanoiHotel['current'], hanoiHotel['average'], 'hotel'),
+          priceHistory: hanoiHotel['history'] as List<double>,
+          purchaseUrl: _bookingUrl(hanoiHotel['city'], hanoiHotel['checkIn'], hanoiHotel['checkOut']),
+          purchaseLabel: 'Search on Booking.com',
+        ),
+        _buildPriceAlertCard(
+          title: 'Hotels: Hanoi (Agoda)',
+          currentPrice: '${(hanoiHotel['current'] * 0.95).toStringAsFixed(0)} OMR/night',
+          averagePrice: '${hanoiHotel['average'].toStringAsFixed(0)} OMR/night',
+          trend: PriceTrend.below,
+          detail: 'Agoda often has better deals for Southeast Asia. Compare before booking.',
+          priceHistory: hanoiHotel['history'] as List<double>,
+          purchaseUrl: _agodaUrl(hanoiHotel['city'], hanoiHotel['checkIn'], hanoiHotel['checkOut']),
+          purchaseLabel: 'Search on Agoda',
+        ),
+        const SizedBox(height: 8),
+        _buildPriceAlertCard(
+          title: 'Airbnb: Hanoi',
+          currentPrice: '${(hanoiHotel['current'] * 0.85).toStringAsFixed(0)} OMR/night',
+          averagePrice: '${(hanoiHotel['average'] * 0.9).toStringAsFixed(0)} OMR/night',
+          trend: PriceTrend.below,
+          detail: 'Great for longer stays. Often includes kitchen to save on food costs.',
+          priceHistory: hanoiHotel['history'] as List<double>,
+          purchaseUrl: _airbnbUrl('Hanoi', hanoiHotel['checkIn'], hanoiHotel['checkOut']),
+          purchaseLabel: 'Search on Airbnb',
+        ),
+        const SizedBox(height: 16),
+        // HCMC hotels
+        _buildPriceAlertCard(
+          title: 'Hotels: HCMC District 1',
+          currentPrice: '${hcmcHotel['current'].toStringAsFixed(0)} OMR/night',
+          averagePrice: '${hcmcHotel['average'].toStringAsFixed(0)} OMR/night',
+          trend: _trend(hcmcHotel['current'], hcmcHotel['average']),
+          detail: _buildPriceInsight(hcmcHotel['current'], hcmcHotel['average'], 'hotel'),
+          priceHistory: hcmcHotel['history'] as List<double>,
+          purchaseUrl: _bookingUrl(hcmcHotel['city'], hcmcHotel['checkIn'], hcmcHotel['checkOut']),
+          purchaseLabel: 'Search on Booking.com',
+        ),
+        _buildPriceAlertCard(
+          title: 'Airbnb: Ho Chi Minh City',
+          currentPrice: '${(hcmcHotel['current'] * 0.88).toStringAsFixed(0)} OMR/night',
+          averagePrice: '${(hcmcHotel['average'] * 0.9).toStringAsFixed(0)} OMR/night',
+          trend: PriceTrend.below,
+          detail: 'Popular in D1 and D3. Many have pools and gyms.',
+          priceHistory: hcmcHotel['history'] as List<double>,
+          purchaseUrl: _airbnbUrl('Ho+Chi+Minh+City', hcmcHotel['checkIn'], hcmcHotel['checkOut']),
+          purchaseLabel: 'Search on Airbnb',
+        ),
+        const SizedBox(height: 16),
+        // Cruise
+        _buildSectionHeader('🚢 Ha Long Bay Cruise', '2-day 1-night cruise pricing'),
+        const SizedBox(height: 8),
+        _buildPriceAlertCard(
+          title: 'Ha Long Bay Cruise (2D1N)',
+          currentPrice: '${cruise['current'].toStringAsFixed(0)} OMR/person',
+          averagePrice: '${cruise['average'].toStringAsFixed(0)} OMR/person',
+          trend: _trend(cruise['current'], cruise['average']),
+          detail: _buildPriceInsight(cruise['current'], cruise['average'], 'activity'),
+          priceHistory: cruise['history'] as List<double>,
+          purchaseUrl: _bookingUrl('Ha+Long+Bay', cruise['date'], cruise['date']),
+          purchaseLabel: 'Search Cruises',
+        ),
+        const SizedBox(height: 40),
+      ],
+    );
+  }
+
+  Widget _buildRecommendedAppsTab() {
+    final apps = [
+      {'name': 'Grab', 'category': 'Ride Hailing & Food', 'description': '#1 ride app in Vietnam. Book motorbike taxis, cars, order food delivery. Works in all major cities.', 'url': 'https://www.grab.com/vn/', 'icon': Icons.local_taxi, 'color': const Color(0xFF00B14F)},
+      {'name': 'Be', 'category': 'Ride Hailing', 'description': 'Grab competitor with good motorbike taxi rates in Hanoi and HCMC.', 'url': 'https://be.com.vn/', 'icon': Icons.motorcycle, 'color': const Color(0xFFE53935)},
+      {'name': 'Gojek (GoViet)', 'category': 'Ride Hailing', 'description': 'Another ride option with competitive pricing. Download locally.', 'url': 'https://www.gojek.com/', 'icon': Icons.directions_bike, 'color': const Color(0xFF00AA13)},
+      {'name': 'Vietnam Airlines', 'category': 'Domestic Flights', 'description': 'Flag carrier for domestic routes HCMC-Phu Quoc. Book early for best rates.', 'url': 'https://www.vietnamairlines.com/', 'icon': Icons.flight, 'color': const Color(0xFF0066B3)},
+      {'name': 'Bamboo Airways', 'category': 'Domestic Flights', 'description': 'Low-cost domestic carrier with good HCMC-Phu Quoc route coverage.', 'url': 'https://bambooairways.com/', 'icon': Icons.flight_takeoff, 'color': const Color(0xFF8BC34A)},
+      {'name': 'Vexere', 'category': 'Bus Tickets', 'description': 'Book long-distance buses online. Useful for overland travel between cities.', 'url': 'https://vexere.com/', 'icon': Icons.directions_bus, 'color': const Color(0xFFFF9800)},
+      {'name': 'Phương Trang (Futa Bus)', 'category': 'Bus Tickets', 'description': 'Major bus operator with online booking for intercity routes.', 'url': 'https://futabus.vn/', 'icon': Icons.bus_alert, 'color': const Color(0xFFFF5722)},
+      {'name': '12Go Asia', 'category': 'Transport Booking', 'description': 'Book trains, buses, ferries across Vietnam in one app. Good for comparing options.', 'url': 'https://12go.asia/en/vietnam', 'icon': Icons.train, 'color': const Color(0xFF3F51B5)},
+      {'name': 'MoMo', 'category': 'Payment & Wallet', 'description': 'Vietnam\'s top e-wallet. Pay at many shops, restaurants. Tourist-friendly.', 'url': 'https://momo.vn/', 'icon': Icons.account_balance_wallet, 'color': const Color(0xFFA83279)},
+      {'name': 'Google Translate', 'category': 'Language', 'description': 'Download Vietnamese offline pack. Camera translate for menus/signs.', 'url': 'https://translate.google.com/', 'icon': Icons.translate, 'color': const Color(0xFF4285F4)},
+      {'name': 'XE Currency', 'category': 'Currency', 'description': 'Real-time OMR to VND rates. Helpful for quick mental math while shopping.', 'url': 'https://www.xe.com/', 'icon': Icons.attach_money, 'color': const Color(0xFF00BFA6)},
+      {'name': 'Google Maps', 'category': 'Navigation', 'description': 'Works offline — download Hanoi and HCMC maps. Walking directions are reliable.', 'url': 'https://maps.google.com/', 'icon': Icons.map, 'color': const Color(0xFF34A853)},
+    ];
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _buildSectionHeader('� Recommended Apps for Vietnam', 'Download before your trip'),
+        const SizedBox(height: 12),
+        ...apps.map((app) => _buildAppCard(
+          name: app['name'] as String,
+          category: app['category'] as String,
+          description: app['description'] as String,
+          url: app['url'] as String,
+          icon: app['icon'] as IconData,
+          color: app['color'] as Color,
+        )),
+        const SizedBox(height: 40),
+      ],
+    );
+  }
+
+  Widget _buildWeatherTab() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _buildSectionHeader('🌤️ Weather Warnings', 'Only alerts for severe conditions'),
+        const SizedBox(height: 12),
+        _buildWeatherCard(
+          location: 'Hanoi',
+          date: _formatDateRange(
+            widget.trip.days.first.date,
+            widget.trip.days[2].date,
+          ),
+          status: WeatherStatus.good,
+          detail: 'October: Cool and dry. Avg 22°C. Great for sightseeing.',
+          icon: Icons.wb_sunny,
+        ),
+        _buildWeatherCard(
+          location: 'Ha Long Bay',
+          date: widget.trip.days.length > 3 ? widget.trip.days[3].date : 'Day 4',
+          status: WeatherStatus.caution,
+          detail: 'Light rain possible. Bring a rain jacket for the cruise.',
+          icon: Icons.cloud_queue,
+        ),
+        _buildWeatherCard(
+          location: 'Ho Chi Minh City',
+          date: _formatDateRange(
+            widget.trip.days.length > 5 ? widget.trip.days[5].date : 'Day 6',
+            widget.trip.days.length > 9 ? widget.trip.days[9].date : 'Day 10',
+          ),
+          status: WeatherStatus.warning,
+          detail: 'Heavy afternoon showers expected (2-4pm daily). Plan indoor activities during these hours.',
+          icon: Icons.umbrella,
+        ),
+        const SizedBox(height: 40),
+      ],
+    );
+  }
+
+  Widget _buildScheduleTab(Map<String, dynamic> cuChi, Map<String, dynamic> mekong) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _buildSectionHeader('📅 Schedule Checks', 'Closed days & timing conflicts'),
+        const SizedBox(height: 12),
+        _buildClosureCard(
+          venue: 'Ho Chi Minh Mausoleum',
+          plannedDay: 'Day 3 (${widget.trip.days.length > 2 ? widget.trip.days[2].date : "Day 3"})',
+          issue: _checkMausoleumClosure(widget.trip.days.length > 2 ? widget.trip.days[2].date : ""),
+          status: _getMausoleumStatus(widget.trip.days.length > 2 ? widget.trip.days[2].date : ""),
+        ),
+        _buildClosureCard(
+          venue: 'War Remnants Museum',
+          plannedDay: 'Day 6 (${widget.trip.days.length > 5 ? widget.trip.days[5].date : "Day 6"})',
+          issue: 'Open daily 7:30am-6pm. No conflict.',
+          status: ClosureStatus.ok,
+        ),
+        _buildClosureCard(
+          venue: 'Cu Chi Tunnels',
+          plannedDay: 'Day 7 (${widget.trip.days.length > 6 ? widget.trip.days[6].date : "Day 7"})',
+          issue: 'Open daily. Morning visit recommended to avoid crowds.',
+          status: ClosureStatus.ok,
+        ),
+        const SizedBox(height: 24),
+        // Activities section
+        _buildSectionHeader('� Tours & Activities', 'Popular add-ons'),
+        const SizedBox(height: 12),
+        _buildPriceAlertCard(
+          title: 'Cu Chi Tunnels Tour',
+          currentPrice: '${cuChi['current'].toStringAsFixed(0)} OMR/person',
+          averagePrice: '${cuChi['average'].toStringAsFixed(0)} OMR/person',
+          trend: _trend(cuChi['current'], cuChi['average']),
+          detail: _buildPriceInsight(cuChi['current'], cuChi['average'], 'activity'),
+          priceHistory: cuChi['history'] as List<double>,
+          purchaseUrl: _bookingUrl('Ho+Chi+Minh+City', cuChi['date'], cuChi['date']),
+          purchaseLabel: 'Search Tours',
+        ),
+        _buildPriceAlertCard(
+          title: 'Mekong Delta Tour',
+          currentPrice: '${mekong['current'].toStringAsFixed(0)} OMR/person',
+          averagePrice: '${mekong['average'].toStringAsFixed(0)} OMR/person',
+          trend: _trend(mekong['current'], mekong['average']),
+          detail: _buildPriceInsight(mekong['current'], mekong['average'], 'activity'),
+          priceHistory: mekong['history'] as List<double>,
+          purchaseUrl: _bookingUrl('Ho+Chi+Minh+City', mekong['date'], mekong['date']),
+          purchaseLabel: 'Search Tours',
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF6C63FF).withOpacity(0.05),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.privacy_tip_outlined, size: 16, color: Color(0xFF6C63FF)),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'All booking links use clean search URLs — no affiliate tracking, no cookies that raise prices.',
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF666666)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 40),
+      ],
+    );
+  }
+
+  // ─── New Card Builders ─────────────────────────────────────────────
+
+  Widget _buildRentalCard({
+    required String provider,
+    required String description,
+    required String url,
+    required Color color,
+    required IconData icon,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+            child: Icon(icon, size: 20, color: color),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(provider, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 2),
+                Text(description, style: const TextStyle(fontSize: 12, color: Color(0xFF666666), height: 1.3)),
+              ],
+            ),
+          ),
+          OutlinedButton.icon(
+            onPressed: () => _openUrl(url),
+            icon: const Icon(Icons.open_in_new, size: 13),
+            label: const Text('Search', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: color,
+              side: BorderSide(color: color.withOpacity(0.5)),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAppCard({
+    required String name,
+    required String category,
+    required String description,
+    required String url,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+            child: Icon(icon, size: 20, color: color),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
+                      child: Text(category, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: color)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(description, style: const TextStyle(fontSize: 12, color: Color(0xFF555555), height: 1.4)),
+                const SizedBox(height: 6),
+                TextButton.icon(
+                  onPressed: () => _openUrl(url),
+                  icon: const Icon(Icons.open_in_new, size: 12),
+                  label: Text('Visit ${name}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildSectionHeader(String title, String subtitle) {
