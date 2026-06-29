@@ -12,15 +12,12 @@
 /// Actual security comes from Firestore Security Rules.
 
 class FirebaseConfig {
-  // 🔑 PASTE YOUR VALUES HERE
-  static const String apiKey = 'YOUR_API_KEY';
-  static const String authDomain = 'YOUR_PROJECT.firebaseapp.com';
-  static const String projectId = 'YOUR_PROJECT_ID';
-  static const String storageBucket = 'YOUR_PROJECT.appspot.com';
-  static const String messagingSenderId = 'YOUR_SENDER_ID';
-  static const String appId = 'YOUR_APP_ID';
+  static const String apiKey = 'AIzaSyAiKaxa6UVKqoQCirMU5beBFBSfautuyTI';
+  static const String authDomain = 'drift-expenses.firebaseapp.com';
+  static const String projectId = 'drift-expenses';
+  static const String storageBucket = 'drift-expenses.firebasestorage.app';
+  static const String messagingSenderId = '373750180502';
+  static const String appId = '1:373750180502:web:5b56b9f478fdf3acfcb0b7';
 
-  // Set this to true once you've pasted real values
-  static bool get isConfigured =>
-      apiKey != 'YOUR_API_KEY' && projectId != 'YOUR_PROJECT_ID';
+  static bool get isConfigured => true;
 }
