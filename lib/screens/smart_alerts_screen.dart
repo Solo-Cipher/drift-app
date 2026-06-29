@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/trip_data.dart';
+import '../data/city_configs.dart';
+import '../services/closure_checker.dart';
 
 class SmartAlertsScreen extends StatefulWidget {
   final TripData trip;
@@ -13,6 +15,23 @@ class SmartAlertsScreen extends StatefulWidget {
 }
 
 class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
+  CityConfig? _config;
+
+  @override
+  void initState() {
+    super.initState();
+    _config = _findConfig();
+  }
+
+  CityConfig? _findConfig() {
+    for (final key in CityConfigs.availableCountries) {
+      final c = CityConfigs.get(key);
+      if (widget.trip.days.any((d) => d.country.toLowerCase() == c.country.toLowerCase())) {
+        return c;
+      }
+    }
+    return null;
+  }
   /// Build a clean Skyscanner search URL — no affiliate params, no tracking
   String _skyscannerUrl(String from, String to, String date) {
     final parsed = _parseDate(date);
@@ -41,8 +60,8 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
       'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12,
     };
     final parts = dateStr.split(' ');
-    final month = months[parts[0]] ?? 10;
-    final day = int.tryParse(parts[1].replaceAll(',', '')) ?? 18;
+    final month = months[parts[0]] ?? widget.trip.baseStartDate.month;
+    final day = int.tryParse(parts[1].replaceAll(',', '')) ?? widget.trip.baseStartDate.day;
     return DateTime(widget.trip.baseStartDate.year, month, day);
   }
 
@@ -94,118 +113,104 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
     return history;
   }
 
-  /// Flight pricing: Muscat → Hanoi
+  /// Flight pricing: dynamic from CityConfig
   Map<String, dynamic> _getFlightPricing() {
+    final config = _config;
+    final fromCode = config?.originAirport ?? 'MCT';
+    final toCode = config?.iataCode ?? (widget.trip.days.isNotEmpty ? widget.trip.days.first.location.substring(0, 3).toUpperCase() : '???');
+    final basePrice = config?.flightBasePrice ?? 200.0;
     final seed = widget.trip.baseStartDate.day + widget.trip.baseStartDate.month * 31;
     final factor = _priceFactor(widget.trip.baseStartDate.day, widget.trip.baseStartDate.month, seed);
-    final basePrice = 220.0; // OMR base for MCT→HAN
     final current = (basePrice * factor);
     final avg = basePrice * 1.05;
+    final toLabel = config?.primaryCity ?? 'Destination';
     return {
       'current': current,
       'average': avg,
       'history': _generatePriceHistory(current, seed),
       'departureDate': widget.trip.startDate,
-      'from': 'MCT',
-      'to': 'HAN',
-      'label': 'Flights: Muscat → Hanoi',
+      'from': fromCode,
+      'to': toCode,
+      'label': 'Flights: $fromCode → $toCode',
+      'fromLabel': fromCode,
+      'toLabel': toLabel,
+      'currency': widget.trip.currency,
     };
   }
 
-  /// Hanoi hotel pricing
-  Map<String, dynamic> _getHanoiHotelPricing() {
-    final hanoiDays = widget.trip.days.where((d) => d.location.contains('Hanoi') && !d.location.contains('Ha Long'));
-    final start = hanoiDays.isNotEmpty ? hanoiDays.first.date : widget.trip.startDate;
-    final end = hanoiDays.isNotEmpty ? hanoiDays.last.date : widget.trip.days[2].date;
-    final seed = start.hashCode;
-    final factor = _priceFactor(_parseDate(start).day, _parseDate(start).month, seed);
-    final basePrice = 28.0;
-    final current = (basePrice * factor);
-    final avg = basePrice * 1.0;
-    return {
-      'current': current,
-      'average': avg,
-      'history': _generatePriceHistory(current, seed + 100),
-      'checkIn': start,
-      'checkOut': end,
-      'label': 'Hotels: Hanoi Old Quarter',
-      'city': 'Hanoi',
-    };
+  /// Dynamic hotel pricing per unique location in trip
+  List<Map<String, dynamic>> _getHotelPricings() {
+    final config = _config;
+    if (config == null) return [];
+    
+    // Group days by unique location
+    final locationGroups = <String, List<int>>{};
+    for (int i = 0; i < widget.trip.days.length; i++) {
+      final loc = widget.trip.days[i].location;
+      locationGroups.putIfAbsent(loc, () => []).add(i);
+    }
+    
+    final pricings = <Map<String, dynamic>>[];
+    final baseHotel = config.defaultHotelBase;
+    
+    for (final entry in locationGroups.entries) {
+      final loc = entry.key;
+      final indices = entry.value;
+      final firstIdx = indices.first;
+      final lastIdx = indices.last;
+      final start = widget.trip.days[firstIdx].date;
+      final end = widget.trip.days[lastIdx].date;
+      final seed = loc.hashCode % 10000;
+      final factor = _priceFactor(firstIdx + 1, widget.trip.baseStartDate.month, seed);
+      final current = baseHotel * factor;
+      final avg = baseHotel * 1.0;
+      
+      pricings.add({
+        'current': current,
+        'average': avg,
+        'history': _generatePriceHistory(current, seed + 100),
+        'checkIn': start,
+        'checkOut': end,
+        'city': loc.replaceAll(' ', '+'),
+        'label': 'Hotels: $loc',
+        'currency': widget.trip.currency,
+      });
+    }
+    return pricings;
   }
 
-  /// HCMC hotel pricing
-  Map<String, dynamic> _getHcmcHotelPricing() {
-    final hcmcDays = widget.trip.days.where((d) => d.location.contains('Ho Chi Minh'));
-    final start = hcmcDays.isNotEmpty ? hcmcDays.first.date : widget.trip.days[5].date;
-    final end = hcmcDays.isNotEmpty ? hcmcDays.last.date : widget.trip.days[9].date;
-    final seed = start.hashCode + 50;
-    final factor = _priceFactor(_parseDate(start).day, _parseDate(start).month, seed);
-    final basePrice = 24.0;
-    final current = (basePrice * factor);
-    final avg = basePrice * 0.95;
-    return {
-      'current': current,
-      'average': avg,
-      'history': _generatePriceHistory(current, seed + 200),
-      'checkIn': start,
-      'checkOut': end,
-      'label': 'Hotels: HCMC District 1',
-      'city': 'Ho+Chi+Minh+City',
-    };
-  }
-
-  /// Ha Long Bay Cruise pricing
-  Map<String, dynamic> _getCruisePricing() {
-    final haLongDay = widget.trip.days.where((d) => d.location.contains('Ha Long')).firstOrNull;
-    final date = haLongDay?.date ?? widget.trip.days[3].date;
-    final seed = date.hashCode + 99;
-    final factor = _priceFactor(_parseDate(date).day, _parseDate(date).month, seed);
-    final basePrice = 48.0;
-    final current = (basePrice * factor);
-    final avg = basePrice * 0.98;
-    return {
-      'current': current,
-      'average': avg,
-      'history': _generatePriceHistory(current, seed + 300),
-      'date': date,
-      'label': 'Ha Long Bay Cruise (2D1N)',
-    };
-  }
-
-  /// Activity pricing: Cu Chi Tunnels
-  Map<String, dynamic> _getCuChiPricing() {
-    final day = widget.trip.days.where((d) => d.activities.any((a) => a.toLowerCase().contains('cu chi'))).firstOrNull;
-    final date = day?.date ?? 'Day 7';
-    final seed = date.hashCode + 77;
-    final factor = _priceFactor(7, 10, seed);
-    final basePrice = 12.0;
-    final current = (basePrice * factor);
-    final avg = basePrice * 1.02;
-    return {
-      'current': current,
-      'average': avg,
-      'history': _generatePriceHistory(current, seed + 400),
-      'date': date,
-      'label': 'Cu Chi Tunnels Tour',
-    };
-  }
-
-  /// Activity pricing: Mekong Delta
-  Map<String, dynamic> _getMekongPricing() {
-    final day = widget.trip.days.where((d) => d.activities.any((a) => a.toLowerCase().contains('mekong'))).firstOrNull;
-    final date = day?.date ?? 'Day 8';
-    final seed = date.hashCode + 55;
-    final factor = _priceFactor(8, 10, seed);
-    final basePrice = 18.0;
-    final current = (basePrice * factor);
-    final avg = basePrice * 0.97;
-    return {
-      'current': current,
-      'average': avg,
-      'history': _generatePriceHistory(current, seed + 500),
-      'date': date,
-      'label': 'Mekong Delta Tour',
-    };
+  /// Dynamic activity pricing — picks up to 2 notable activities from the trip
+  List<Map<String, dynamic>> _getActivityPricings() {
+    final pricings = <Map<String, dynamic>>[];
+    final seen = <String>{};
+    
+    for (final day in widget.trip.days) {
+      for (final activity in day.activities) {
+        final key = activity.toLowerCase();
+        // Pick activities that sound like tours/major attractions
+        if (key.contains('tour') || key.contains('temple') || key.contains('cruise') || 
+            key.contains('island') || key.contains('hike') || key.contains('trek') ||
+            key.contains('diving') || key.contains('snorkel') || key.contains(' safari') ||
+            key.contains('sunrise') || key.contains('sunset')) {
+          if (seen.contains(key)) continue;
+          seen.add(key);
+          final seed = activity.hashCode % 10000;
+          final basePrice = 15.0 + (seed % 20); // 15-35 range
+          final factor = _priceFactor(day.day, widget.trip.baseStartDate.month, seed);
+          pricings.add({
+            'current': basePrice * factor,
+            'average': basePrice * 1.0,
+            'history': _generatePriceHistory(basePrice * factor, seed),
+            'date': day.date,
+            'label': activity,
+            'currency': widget.trip.currency,
+          });
+          if (pricings.length >= 2) break; // Max 2 activity cards
+        }
+      }
+      if (pricings.length >= 2) break;
+    }
+    return pricings;
   }
 
   @override
@@ -215,11 +220,8 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
 
     // Compute all pricing dynamically
     final flight = _getFlightPricing();
-    final hanoiHotel = _getHanoiHotelPricing();
-    final hcmcHotel = _getHcmcHotelPricing();
-    final cruise = _getCruisePricing();
-    final cuChi = _getCuChiPricing();
-    final mekong = _getMekongPricing();
+    final hotels = _getHotelPricings();
+    final activities = _getActivityPricings();
 
     return DefaultTabController(
       length: 5,
@@ -241,9 +243,9 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 8),
             tabs: const [
               Tab(text: '✈️ Flights & Cars'),
-              Tab(text: '🏨 Hotels & Airbnb'),
+              Tab(text: '🏨 Hotels & Stays'),
               Tab(text: '📱 Apps'),
-              Tab(text: '�️ Weather'),
+              Tab(text: '🌤️ Weather'),
               Tab(text: '📅 Schedule'),
             ],
           ),
@@ -251,10 +253,10 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
         body: TabBarView(
           children: [
             _buildFlightsAndCarsTab(flight, daysUntil),
-            _buildHotelsTab(hanoiHotel, hcmcHotel, cruise),
+            _buildHotelsTab(hotels),
             _buildRecommendedAppsTab(),
             _buildWeatherTab(),
-            _buildScheduleTab(cuChi, mekong),
+            _buildScheduleTab(activities),
           ],
         ),
       ),
@@ -397,9 +399,11 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
   // ─── Tab Builders ────────────────────────────────────────────────────
 
   Widget _buildFlightsAndCarsTab(Map<String, dynamic> flight, int daysUntil) {
-    final hanoiDays = widget.trip.days.where((d) => d.location.contains('Hanoi') && !d.location.contains('Ha Long'));
-    final hanoiStart = hanoiDays.isNotEmpty ? hanoiDays.first.date : widget.trip.startDate;
-    final hanoiEnd = hanoiDays.isNotEmpty ? hanoiDays.last.date : widget.trip.days[2].date;
+    final config = _config;
+    final primaryCity = config?.primaryCity ?? (widget.trip.days.isNotEmpty ? widget.trip.days.first.location : 'City');
+    final travelDays = widget.trip.days.where((d) => d.isTravelDay).toList();
+    final pickupDate = travelDays.isNotEmpty ? travelDays.first.date : widget.trip.startDate;
+    final returnDate = travelDays.isNotEmpty ? travelDays.last.date : widget.trip.endDate;
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -409,33 +413,33 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
         _buildDepartureCountdown(daysUntil),
         const SizedBox(height: 16),
         // Flight pricing
-        _buildSectionHeader('✈️ Flights', 'Muscat → Hanoi'),
+        _buildSectionHeader('✈️ Flights', '${flight['fromLabel']} → ${flight['toLabel']}'),
         const SizedBox(height: 8),
         _buildPriceAlertCard(
-          title: flight['label'],
-          currentPrice: '${flight['current'].toStringAsFixed(0)} OMR',
-          averagePrice: '${flight['average'].toStringAsFixed(0)} OMR',
-          trend: _trend(flight['current'], flight['average']),
-          detail: _buildPriceInsight(flight['current'], flight['average'], 'flight'),
+          title: flight['label'] as String,
+          currentPrice: '${(flight['current'] as double).toStringAsFixed(0)} ${flight['currency']}',
+          averagePrice: '${(flight['average'] as double).toStringAsFixed(0)} ${flight['currency']}',
+          trend: _trend(flight['current'] as double, flight['average'] as double),
+          detail: _buildPriceInsight(flight['current'] as double, flight['average'] as double, 'flight'),
           priceHistory: flight['history'] as List<double>,
-          purchaseUrl: _skyscannerUrl(flight['from'], flight['to'], flight['departureDate']),
+          purchaseUrl: _skyscannerUrl(flight['from'] as String, flight['to'] as String, flight['departureDate'] as String),
           purchaseLabel: 'Search on Skyscanner',
         ),
         const SizedBox(height: 16),
         // Car rental
-        _buildSectionHeader('🚗 Rental Cars in Hanoi', 'Compare prices across providers'),
+        _buildSectionHeader('� Rental Cars', 'Compare providers in $primaryCity'),
         const SizedBox(height: 8),
         _buildRentalCard(
           provider: 'Sixt',
           description: 'Wide range of vehicles including sedans and SUVs',
-          url: _sixtUrl('hanoi', hanoiStart, hanoiEnd),
+          url: _sixtUrl(primaryCity.toLowerCase().replaceAll(' ', '-'), pickupDate, returnDate),
           color: const Color(0xFFE53935),
           icon: Icons.directions_car,
         ),
         _buildRentalCard(
           provider: 'Enterprise',
           description: 'Reliable service with airport pickup available',
-          url: _enterpriseUrl('hanoi', hanoiStart, hanoiEnd),
+          url: _enterpriseUrl(primaryCity.toLowerCase().replaceAll(' ', '-'), pickupDate, returnDate),
           color: const Color(0xFF43A047),
           icon: Icons.business,
         ),
@@ -444,80 +448,79 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
     );
   }
 
-  Widget _buildHotelsTab(Map<String, dynamic> hanoiHotel, Map<String, dynamic> hcmcHotel, Map<String, dynamic> cruise) {
+  Widget _buildHotelsTab(List<Map<String, dynamic>> hotels) {
+    final config = _config;
+    final currency = widget.trip.currency;
+
+    // Build a flat list of price alert cards from each hotel entry.
+    // Each hotel generates: Booking.com card, Agoda card (5% cheaper), Airbnb card (15% cheaper).
+    final hotelCards = <Widget>[];
+    String? lastCity;
+
+    for (final hotel in hotels) {
+      final current = (hotel['current'] as double);
+      final average = (hotel['average'] as double);
+      final history = hotel['history'] as List<double>;
+      final city = hotel['city'] as String;
+      final checkIn = hotel['checkIn'] as String;
+      final checkOut = hotel['checkOut'] as String;
+      final label = hotel['label'] as String;
+      final hotelCurrency = hotel['currency'] as String? ?? currency;
+      final cityDisplay = city.replaceAll('+', ' ');
+
+      // Add a section header when the city changes
+      if (cityDisplay != lastCity) {
+        hotelCards.add(_buildSectionHeader('🏨 $cityDisplay', 'Compare across Booking, Agoda & Airbnb'));
+        hotelCards.add(const SizedBox(height: 12));
+        lastCity = cityDisplay;
+      }
+
+      // Booking.com card
+      hotelCards.add(_buildPriceAlertCard(
+        title: label,
+        currentPrice: '${current.toStringAsFixed(0)} $hotelCurrency/night',
+        averagePrice: '${average.toStringAsFixed(0)} $hotelCurrency/night',
+        trend: _trend(current, average),
+        detail: _buildPriceInsight(current, average, 'hotel'),
+        priceHistory: history,
+        purchaseUrl: _bookingUrl(city, checkIn, checkOut),
+        purchaseLabel: 'Search on Booking.com',
+      ));
+
+      // Agoda card (typically ~5% cheaper)
+      hotelCards.add(_buildPriceAlertCard(
+        title: '$cityDisplay (Agoda)',
+        currentPrice: '${(current * 0.95).toStringAsFixed(0)} $hotelCurrency/night',
+        averagePrice: '${average.toStringAsFixed(0)} $hotelCurrency/night',
+        trend: PriceTrend.below,
+        detail: 'Agoda often has better deals for Southeast Asia. Compare before booking.',
+        priceHistory: history,
+        purchaseUrl: _agodaUrl(city, checkIn, checkOut),
+        purchaseLabel: 'Search on Agoda',
+      ));
+
+      // Airbnb card (typically ~15% cheaper)
+      hotelCards.add(_buildPriceAlertCard(
+        title: 'Airbnb: $cityDisplay',
+        currentPrice: '${(current * 0.85).toStringAsFixed(0)} $hotelCurrency/night',
+        averagePrice: '${(average * 0.9).toStringAsFixed(0)} $hotelCurrency/night',
+        trend: PriceTrend.below,
+        detail: 'Great for longer stays. Often includes kitchen to save on food costs.',
+        priceHistory: history,
+        purchaseUrl: _airbnbUrl(cityDisplay, checkIn, checkOut),
+        purchaseLabel: 'Search on Airbnb',
+      ));
+
+      hotelCards.add(const SizedBox(height: 8));
+    }
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _buildSectionHeader('🏨 Hotels & Airbnb', 'Compare across Booking, Agoda & Airbnb'),
-        const SizedBox(height: 12),
-        // Hanoi hotels
-        _buildPriceAlertCard(
-          title: 'Hotels: Hanoi Old Quarter',
-          currentPrice: '${hanoiHotel['current'].toStringAsFixed(0)} OMR/night',
-          averagePrice: '${hanoiHotel['average'].toStringAsFixed(0)} OMR/night',
-          trend: _trend(hanoiHotel['current'], hanoiHotel['average']),
-          detail: _buildPriceInsight(hanoiHotel['current'], hanoiHotel['average'], 'hotel'),
-          priceHistory: hanoiHotel['history'] as List<double>,
-          purchaseUrl: _bookingUrl(hanoiHotel['city'], hanoiHotel['checkIn'], hanoiHotel['checkOut']),
-          purchaseLabel: 'Search on Booking.com',
-        ),
-        _buildPriceAlertCard(
-          title: 'Hotels: Hanoi (Agoda)',
-          currentPrice: '${(hanoiHotel['current'] * 0.95).toStringAsFixed(0)} OMR/night',
-          averagePrice: '${hanoiHotel['average'].toStringAsFixed(0)} OMR/night',
-          trend: PriceTrend.below,
-          detail: 'Agoda often has better deals for Southeast Asia. Compare before booking.',
-          priceHistory: hanoiHotel['history'] as List<double>,
-          purchaseUrl: _agodaUrl(hanoiHotel['city'], hanoiHotel['checkIn'], hanoiHotel['checkOut']),
-          purchaseLabel: 'Search on Agoda',
-        ),
-        const SizedBox(height: 8),
-        _buildPriceAlertCard(
-          title: 'Airbnb: Hanoi',
-          currentPrice: '${(hanoiHotel['current'] * 0.85).toStringAsFixed(0)} OMR/night',
-          averagePrice: '${(hanoiHotel['average'] * 0.9).toStringAsFixed(0)} OMR/night',
-          trend: PriceTrend.below,
-          detail: 'Great for longer stays. Often includes kitchen to save on food costs.',
-          priceHistory: hanoiHotel['history'] as List<double>,
-          purchaseUrl: _airbnbUrl('Hanoi', hanoiHotel['checkIn'], hanoiHotel['checkOut']),
-          purchaseLabel: 'Search on Airbnb',
-        ),
-        const SizedBox(height: 16),
-        // HCMC hotels
-        _buildPriceAlertCard(
-          title: 'Hotels: HCMC District 1',
-          currentPrice: '${hcmcHotel['current'].toStringAsFixed(0)} OMR/night',
-          averagePrice: '${hcmcHotel['average'].toStringAsFixed(0)} OMR/night',
-          trend: _trend(hcmcHotel['current'], hcmcHotel['average']),
-          detail: _buildPriceInsight(hcmcHotel['current'], hcmcHotel['average'], 'hotel'),
-          priceHistory: hcmcHotel['history'] as List<double>,
-          purchaseUrl: _bookingUrl(hcmcHotel['city'], hcmcHotel['checkIn'], hcmcHotel['checkOut']),
-          purchaseLabel: 'Search on Booking.com',
-        ),
-        _buildPriceAlertCard(
-          title: 'Airbnb: Ho Chi Minh City',
-          currentPrice: '${(hcmcHotel['current'] * 0.88).toStringAsFixed(0)} OMR/night',
-          averagePrice: '${(hcmcHotel['average'] * 0.9).toStringAsFixed(0)} OMR/night',
-          trend: PriceTrend.below,
-          detail: 'Popular in D1 and D3. Many have pools and gyms.',
-          priceHistory: hcmcHotel['history'] as List<double>,
-          purchaseUrl: _airbnbUrl('Ho+Chi+Minh+City', hcmcHotel['checkIn'], hcmcHotel['checkOut']),
-          purchaseLabel: 'Search on Airbnb',
-        ),
-        const SizedBox(height: 16),
-        // Cruise
-        _buildSectionHeader('🚢 Ha Long Bay Cruise', '2-day 1-night cruise pricing'),
-        const SizedBox(height: 8),
-        _buildPriceAlertCard(
-          title: 'Ha Long Bay Cruise (2D1N)',
-          currentPrice: '${cruise['current'].toStringAsFixed(0)} OMR/person',
-          averagePrice: '${cruise['average'].toStringAsFixed(0)} OMR/person',
-          trend: _trend(cruise['current'], cruise['average']),
-          detail: _buildPriceInsight(cruise['current'], cruise['average'], 'activity'),
-          priceHistory: cruise['history'] as List<double>,
-          purchaseUrl: _bookingUrl('Ha+Long+Bay', cruise['date'], cruise['date']),
-          purchaseLabel: 'Search Cruises',
-        ),
+        if (hotels.isEmpty)
+          _buildSectionHeader('🏨 Hotels & Airbnb', 'No hotel data available for this trip.')
+        else
+          ...hotelCards,
         const SizedBox(height: 40),
       ],
     );
@@ -595,7 +598,9 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
     );
   }
 
-  Widget _buildScheduleTab(Map<String, dynamic> cuChi, Map<String, dynamic> mekong) {
+  Widget _buildScheduleTab(List<Map<String, dynamic>> activities) {
+    final cuChi = activities.isNotEmpty ? activities[0] : null;
+    final mekong = activities.length > 1 ? activities[1] : null;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -623,26 +628,28 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
         // Activities section
         _buildSectionHeader('� Tours & Activities', 'Popular add-ons'),
         const SizedBox(height: 12),
-        _buildPriceAlertCard(
-          title: 'Cu Chi Tunnels Tour',
-          currentPrice: '${cuChi['current'].toStringAsFixed(0)} OMR/person',
-          averagePrice: '${cuChi['average'].toStringAsFixed(0)} OMR/person',
-          trend: _trend(cuChi['current'], cuChi['average']),
-          detail: _buildPriceInsight(cuChi['current'], cuChi['average'], 'activity'),
-          priceHistory: cuChi['history'] as List<double>,
-          purchaseUrl: _bookingUrl('Ho+Chi+Minh+City', cuChi['date'], cuChi['date']),
-          purchaseLabel: 'Search Tours',
-        ),
-        _buildPriceAlertCard(
-          title: 'Mekong Delta Tour',
-          currentPrice: '${mekong['current'].toStringAsFixed(0)} OMR/person',
-          averagePrice: '${mekong['average'].toStringAsFixed(0)} OMR/person',
-          trend: _trend(mekong['current'], mekong['average']),
-          detail: _buildPriceInsight(mekong['current'], mekong['average'], 'activity'),
-          priceHistory: mekong['history'] as List<double>,
-          purchaseUrl: _bookingUrl('Ho+Chi+Minh+City', mekong['date'], mekong['date']),
-          purchaseLabel: 'Search Tours',
-        ),
+        if (cuChi != null)
+          _buildPriceAlertCard(
+            title: cuChi['label'] ?? 'Cu Chi Tunnels Tour',
+            currentPrice: '${(cuChi['current'] as double).toStringAsFixed(0)} ${cuChi['currency']}/person',
+            averagePrice: '${(cuChi['average'] as double).toStringAsFixed(0)} ${cuChi['currency']}/person',
+            trend: _trend(cuChi['current'] as double, cuChi['average'] as double),
+            detail: _buildPriceInsight(cuChi['current'] as double, cuChi['average'] as double, 'activity'),
+            priceHistory: cuChi['history'] as List<double>,
+            purchaseUrl: _bookingUrl('Ho+Chi+Minh+City', cuChi['date'] as String, cuChi['date'] as String),
+            purchaseLabel: 'Search Tours',
+          ),
+        if (mekong != null)
+          _buildPriceAlertCard(
+            title: mekong['label'] ?? 'Mekong Delta Tour',
+            currentPrice: '${(mekong['current'] as double).toStringAsFixed(0)} ${mekong['currency']}/person',
+            averagePrice: '${(mekong['average'] as double).toStringAsFixed(0)} ${mekong['currency']}/person',
+            trend: _trend(mekong['current'] as double, mekong['average'] as double),
+            detail: _buildPriceInsight(mekong['current'] as double, mekong['average'] as double, 'activity'),
+            priceHistory: mekong['history'] as List<double>,
+            purchaseUrl: _bookingUrl('Ho+Chi+Minh+City', mekong['date'] as String, mekong['date'] as String),
+            purchaseLabel: 'Search Tours',
+          ),
         const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(12),
@@ -657,7 +664,7 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
               Expanded(
                 child: Text(
                   'All booking links use clean search URLs — no affiliate tracking, no cookies that raise prices.',
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF666666)),
+                  style: TextStyle(fontSize: 11, color: Color(0xFF666666)),
                 ),
               ),
             ],

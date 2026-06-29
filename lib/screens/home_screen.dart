@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/trip_data.dart';
-import '../data/vietnam_trip.dart';
+import '../data/trip_generator.dart';
 import '../services/closure_checker.dart';
 import '../screens/day_detail_screen.dart';
 import '../screens/cost_screen.dart';
 import '../screens/trip_editor_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/smart_alerts_screen.dart';
+import '../screens/create_or_join_group_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -43,7 +44,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    trip = getVietnamTrip();
+    trip = TripGenerator.generate(countryKey: 'vietnam', startDate: DateTime(2026, 10, 18), endDate: DateTime(2026, 10, 29));
     _headerAnimController = AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
     _listAnimController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200));
     _headerFade = CurvedAnimation(parent: _headerAnimController, curve: Curves.easeOut);
@@ -331,6 +332,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ),
                 ),
             ],
+          ),
+          const SizedBox(height: 8),
+          FloatingActionButton.small(
+            heroTag: 'expenses',
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateOrJoinGroupScreen())),
+            backgroundColor: const Color(0xFF00BFA6),
+            foregroundColor: Colors.white,
+            child: const Icon(Icons.groups),
           ),
           const SizedBox(height: 8),
           FloatingActionButton.small(
