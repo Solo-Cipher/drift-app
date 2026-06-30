@@ -95,26 +95,29 @@ class _TripEditorScreenState extends State<TripEditorScreen> {
     final newStartStr = '${months[newStart.month - 1]} ${newStart.day}, ${newStart.year}';
     final newEndStr = '${months[newEnd.month - 1]} ${newEnd.day}, ${newEnd.year}';
 
+    // Regenerate days using the trip generator to preserve cost data
+    final regeneratedTrip = TripGenerator.generate(
+      countryKey: _selectedCountry,
+      startDate: newStart,
+      endDate: newEnd,
+    );
+
     List<TripDay> newDays = [];
     for (int i = 0; i < newTotalDays; i++) {
       final dayDate = newStart.add(Duration(days: i));
       final dateStr = '${months[dayDate.month - 1]} ${dayDate.day}';
       if (i < _trip.days.length) {
+        // Keep existing day data but update day number and date
         newDays.add(_trip.days[i].copyWith(
           day: i + 1,
           date: dateStr,
         ));
       } else {
-        newDays.add(TripDay(
+        // Use generated day for new days (includes cost estimates)
+        final genDay = regeneratedTrip.days[i];
+        newDays.add(genDay.copyWith(
           day: i + 1,
           date: dateStr,
-          location: 'New destination',
-          country: _selectedCountry,
-          title: 'Day ${i + 1}',
-          description: 'Add your plans for this day',
-          activities: [],
-          icon: Icons.explore,
-          color: const Color(0xFF6C63FF),
         ));
       }
     }
@@ -128,6 +131,7 @@ class _TripEditorScreenState extends State<TripEditorScreen> {
         totalDays: newTotalDays,
         days: newDays,
         baseStartDate: newStart,
+        totalBudget: regeneratedTrip.totalBudget,
       );
     });
 
