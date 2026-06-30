@@ -50571,28 +50571,26 @@ r=a/this.vn(15,1,b)
 for(q=0;q<30;++q)s.push(r*this.vn(q,1,b+q)*(0.9+p.ayb()*0.2))
 s[s.length-1]=a
 return s},
-af2(){var s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,c,b,a=this,a0=a.d,a1=a0==null,a2=a1?null:a0.cx
-if(a2==null)a2="MCT"
-s=a1?null:a0.CW
+af2(){var s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,c,b=this,a=b.d,a0=a==null,a1=a0?null:a.cx
+if(a1==null)a1="MCT"
+s=a0?null:a.CW
 if(s==null)s=200
-a1=a.a.c
-r=a1.x
+a0=b.a.c
+r=a0.x
 q=A.bW(r)+A.bg(r)*31
 r=t.N
 p=A.aJ(r)
-for(a1=a1.w,o=a1.length,n=0;n<a1.length;a1.length===o||(0,A.B)(a1),++n)p.E(0,a1[n].c)
+for(a0=a0.w,o=a0.length,n=0;n<a0.length;a0.length===o||(0,A.B)(a0),++n)p.E(0,a0[n].c)
 m=A.b([],t.l)
-for(a1=A.cn(p,p.r,p.$ti.c),o="Flights: "+a2+" \u2192 ",l=t.z,k=a1.$ti.c,j=0;a1.v();){i=a1.d
+for(a0=A.cn(p,p.r,p.$ti.c),o="Flights: "+a1+" \u2192 ",l=t.z,k=a0.$ti.c,j=0;a0.v();){i=a0.d
 if(i==null)i=k.a(i)
-h=a.acd(i,a0)
+h=b.acd(i,a)
 g=q+j*100
-f=a.a.c.x
-e=a.vn(A.bW(f),A.bg(f),g)
+f=b.a.c.x
+e=b.vn(A.bW(f),A.bg(f),g)
 d=0.7+B.f.be(j,3)*0.3
 c=s*e*d
-f=a.Hp(c,g)
-b=a.a.c
-m.push(A.K(["current",c,"average",s*d,"history",f,"departureDate",b.c,"from",a2,"to",h,"toCity",i,"label",o+h+" ("+i+")","fromLabel",a2,"toLabel",i,"currency",b.r],r,l));++j}return m},
+m.push(A.K(["current",c,"average",s*d,"history",b.Hp(c,g),"departureDate",b.a.c.c,"from",a1,"to",h,"toCity",i,"label",o+h+" ("+i+")","fromLabel",a1,"toLabel",i,"currency","OMR"],r,l));++j}return m},
 acd(a,b){var s,r,q
 if(b!=null)for(s=b.as,s=new A.e9(s,A.m(s).i("e9<1,2>")).gaf(0);s.v();){r=s.d
 q=r.b.a
@@ -50617,7 +50615,7 @@ i=i[g]
 e=B.f.be(B.d.gC(k),1e4)
 d=n*b.vn(h+1,A.bg(b.a.c.x),e)
 c=b.Hp(d,e+100)
-o.push(A.K(["current",d,"average",n,"history",c,"checkIn",f.b,"checkOut",i.b,"city",A.dA(k," ","+"),"label","Hotels: "+k,"currency",b.a.c.r],s,m))}return o},
+o.push(A.K(["current",d,"average",n,"history",c,"checkIn",f.b,"checkOut",i.b,"city",A.dA(k," ","+"),"label","Hotels: "+k,"currency","OMR"],s,m))}return o},
 aeI(){var s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d=this,c=A.b([],t.l),b=t.N,a=A.aJ(b)
 for(s=d.a.c.w,r=s.length,q=t.z,p=0;p<s.length;s.length===r||(0,A.B)(s),++p){o=s[p]
 for(n=o.r,m=n.length,l=o.a,k=o.b,j=0;j<n.length;n.length===m||(0,A.B)(n),++j){i=n[j]
@@ -50629,7 +50627,7 @@ a.E(0,h)
 f=B.f.be(B.d.gC(i),1e4)
 e=15+B.f.be(f,20)
 g=e*d.vn(l,A.bg(d.a.c.x),f)
-c.push(A.K(["current",g,"average",e,"history",d.Hp(g,f),"date",k,"label",i,"currency",d.a.c.r],b,q))
+c.push(A.K(["current",g,"average",e,"history",d.Hp(g,f),"date",k,"label",i,"currency","OMR"],b,q))
 if(c.length>=2)break}}if(c.length>=2)break}return c},
 I(a){var s,r,q,p,o,n=this,m=null
 n.a.toString
