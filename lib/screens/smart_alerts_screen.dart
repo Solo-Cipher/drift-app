@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/trip_data.dart';
 import '../data/city_configs.dart';
+import '../data/poi_configs.dart';
 import '../services/closure_checker.dart';
 
 class SmartAlertsScreen extends StatefulWidget {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../data/poi_configs.dart';
 
 enum TransportMode { flight, bus, boat, train, walk, taxi, car, tuktuk }
 
@@ -149,6 +150,7 @@ class TripData {
   final String currency;
   final List<TripDay> days;
   final DateTime baseStartDate;
+  final List<TripPoiEntry> tripPois;
 
   TripData({
     required this.title,
@@ -160,6 +162,7 @@ class TripData {
     required this.currency,
     required this.days,
     required this.baseStartDate,
+    this.tripPois = const [],
   });
 
   double get totalEstimatedCost {
@@ -169,7 +172,7 @@ class TripData {
   TripData copyWith({
     String? title, String? subtitle, String? startDate, String? endDate,
     int? totalDays, String? totalBudget, String? currency, List<TripDay>? days,
-    DateTime? baseStartDate,
+    DateTime? baseStartDate, List<TripPoiEntry>? tripPois,
   }) {
     return TripData(
       title: title ?? this.title,
@@ -181,6 +184,7 @@ class TripData {
       currency: currency ?? this.currency,
       days: days ?? this.days,
       baseStartDate: baseStartDate ?? this.baseStartDate,
+      tripPois: tripPois ?? this.tripPois,
     );
   }
 

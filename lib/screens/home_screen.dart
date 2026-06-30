@@ -9,6 +9,7 @@ import '../screens/cost_screen.dart';
 import '../screens/trip_editor_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/smart_alerts_screen.dart';
+import '../screens/poi_manager_screen.dart';
 import '../screens/create_or_join_group_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -756,6 +757,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 icon: const Icon(Icons.open_in_new, size: 14),
                                 label: Text('Details', style: GoogleFonts.inter(fontSize: 12)),
                                 style: TextButton.styleFrom(foregroundColor: const Color(0xFF00BFA6), padding: const EdgeInsets.symmetric(horizontal: 8)),
+                              ),
+                              const SizedBox(width: 4),
+                              TextButton.icon(
+                                onPressed: () async {
+                                  final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => PoiManagerScreen(trip: trip, dayNumber: day.day, onSave: (updatedTrip) {
+                                    setState(() {
+                                      trip = updatedTrip;
+                                      _notifications = checkClosures(trip);
+                                    });
+                                  })));
+                                },
+                                icon: const Icon(Icons.place, size: 14),
+                                label: Text('Places', style: GoogleFonts.inter(fontSize: 12)),
+                                style: TextButton.styleFrom(foregroundColor: const Color(0xFFFFAB40), padding: const EdgeInsets.symmetric(horizontal: 8)),
                               ),
                             ],
                           ),
