@@ -160,12 +160,15 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
         'label': 'Flights: $fromCode → $cityIata ($city)',
         'fromLabel': fromCode,
         'toLabel': city,
-        'currency': widget.trip.currency,
+        'currency': _displayCurrency,
       });
       cityIdx++;
     }
     return flights;
   }
+
+  /// All prices in Smart Alerts display in OMR (or trip currency if preferred)
+  String get _displayCurrency => 'OMR';
 
   /// Convert a city name to a reasonable IATA code
   String _cityToIata(String city, CityConfig? config) {
@@ -217,7 +220,7 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
         'checkOut': end,
         'city': loc.replaceAll(' ', '+'),
         'label': 'Hotels: $loc',
-        'currency': widget.trip.currency,
+        'currency': _displayCurrency,
       });
     }
     return pricings;
@@ -247,7 +250,7 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
             'history': _generatePriceHistory(basePrice * factor, seed),
             'date': day.date,
             'label': activity,
-            'currency': widget.trip.currency,
+            'currency': _displayCurrency,
           });
           if (pricings.length >= 2) break; // Max 2 activity cards
         }
