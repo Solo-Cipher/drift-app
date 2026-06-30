@@ -20,7 +20,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
-  late TripData trip;
+  TripData? _trip; // null = new user, no country selected
   late AnimationController _headerAnimController;
   late AnimationController _listAnimController;
   late Animation<double> _headerFade;
@@ -28,6 +28,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   String tripTypeLabel = 'Couple Trip';
   IconData tripTypeIcon = Icons.favorite;
   String currency = 'OMR';
+
+  // Only valid when _trip != null
+  TripData get trip => _trip!;
 
   // Inline editing state
   int? _expandedDayIndex;
@@ -45,7 +48,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    trip = TripGenerator.generate(countryKey: 'vietnam', startDate: DateTime(2026, 10, 18), endDate: DateTime(2026, 10, 29));
+    _trip = null; // Empty for new users
     _headerAnimController = AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
     _listAnimController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200));
     _headerFade = CurvedAnimation(parent: _headerAnimController, curve: Curves.easeOut);
@@ -58,7 +61,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _editTitleController = TextEditingController();
     _editLocationController = TextEditingController();
     _editDescController = TextEditingController();
-    _notifications = checkClosures(trip);
   }
 
   @override
@@ -73,6 +75,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
     super.dispose();
   }
+
+  // ─── Trip lifecycle ──────────────────────────────────────
+
+  void _onTripSaved(TripData newTrip) {
+    setState(() {
+      _trip = newTrip;
+      _notifications = checkClosures(trip);
+      _listAnimController.forward();
+    });
+  }
+
+  // ─── Inline editing ──────────────────────────────────────
 
   void _startEditing(int index) {
     final day = trip.days[index];
@@ -94,9 +108,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _cancelEditing() {
-    setState(() {
-      _isEditing = false;
-    });
+    setState(() => _isEditing = false);
   }
 
   void _saveEditing() {
@@ -114,7 +126,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         activities: newActivities,
         activityLocations: _activityLocations,
       );
-      trip = trip.copyWith(days: days);
+      _trip = trip.copyWith(days: days);
       _isEditing = false;
       _notifications = checkClosures(trip);
     });
@@ -137,8 +149,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     });
   }
 
+  // ─── Notification FAB sheet ──────────────────────────────
+
   void _showNotificationSheet(BuildContext context) {
-    // Group notifications by type
     final closures = _notifications.where((n) => n.type == NotificationType.closure).toList();
     final tickets = _notifications.where((n) => n.type == NotificationType.ticket).toList();
     final timings = _notifications.where((n) => n.type == NotificationType.timing).toList();
@@ -206,7 +219,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         padding: const EdgeInsets.all(16),
                         children: [
                           if (closures.isNotEmpty) ...[
-                            _buildNotificationSectionHeader('🚨 Closures', const Color(0xFFFF6B6B)),
+                            _buildNotificationSectionHeader('� Closures', const Color(0xFFFF6B6B)),
                             ...closures.map((n) => _buildNotificationCard(n)),
                             const SizedBox(height: 16),
                           ],
@@ -216,7 +229,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             const SizedBox(height: 16),
                           ],
                           if (timings.isNotEmpty) ...[
-                            _buildNotificationSectionHeader('⏰ Timing Warnings', const Color(0xFFFFAB40)),
+                            _buildNotificationSectionHeader('� Timing Warnings', const Color(0xFFFFAB40)),
                             ...timings.map((n) => _buildNotificationCard(n)),
                             const SizedBox(height: 16),
                           ],
@@ -289,8 +302,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  // ══════════════════════════════════════════════════════════
+  // MAIN BUILD
+  // ══════════════════════════════════════════════════════════
+
   @override
   Widget build(BuildContext context) {
+    if (_trip == null) return _buildWelcomeScreen(context);
+
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -304,7 +323,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       floatingActionButton: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Notification bell with badge
           Stack(
             clipBehavior: Clip.none,
             children: [
@@ -326,10 +344,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   child: Container(
                     padding: const EdgeInsets.all(4),
                     decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                    child: Text(
-                      '${_notifications.length}',
-                      style: GoogleFonts.inter(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800),
-                    ),
+                    child: Text('${_notifications.length}', style: GoogleFonts.inter(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800)),
                   ),
                 ),
             ],
@@ -347,12 +362,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             heroTag: 'edit',
             onPressed: () async {
               final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => TripEditorScreen(trip: trip)));
-              if (result != null) {
-                setState(() {
-                  trip = result;
-                  _notifications = checkClosures(trip);
-                });
-              }
+              if (result != null) _onTripSaved(result);
             },
             backgroundColor: const Color(0xFF00BFA6),
             foregroundColor: Colors.white,
@@ -371,6 +381,76 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
     );
   }
+
+  // ══════════════════════════════════════════════════════════
+  // WELCOME SCREEN (empty state)
+  // ══════════════════════════════════════════════════════════
+
+  Widget _buildWelcomeScreen(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF6C63FF), Color(0xFF4A42D0)],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.explore, size: 64, color: Colors.white70),
+                  const SizedBox(height: 24),
+                  Text('D R I F T',
+                      style: GoogleFonts.inter(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w300, letterSpacing: 6)),
+                  const SizedBox(height: 8),
+                  Text('Plan Your Next Adventure',
+                      style: GoogleFonts.inter(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800),
+                      textAlign: TextAlign.center),
+                  const SizedBox(height: 12),
+                  Text('Select a country to generate your itinerary.\nSmart alerts, budget tracking, and expense sharing — all in one place.',
+                      style: GoogleFonts.inter(color: Colors.white.withOpacity(0.7), fontSize: 14),
+                      textAlign: TextAlign.center),
+                  const SizedBox(height: 60),
+                  SizedBox(
+                    width: 220,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _openTripEditor(context),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Plan a Trip'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: const Color(0xFF6C63FF),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        textStyle: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openTripEditor(BuildContext context) async {
+    final dummyTrip = _trip ?? TripGenerator.generate(countryKey: 'vietnam', startDate: DateTime.now().add(const Duration(days: 30)), endDate: DateTime.now().add(const Duration(days: 40)));
+    final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => TripEditorScreen(trip: dummyTrip)));
+    if (result != null && result is TripData) {
+      _onTripSaved(result);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ITINERARY VIEWS
+  // ══════════════════════════════════════════════════════════
 
   Widget _buildSliverAppBar(BuildContext context) {
     return SliverAppBar(
@@ -512,51 +592,38 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ],
             ),
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(child: _buildInfoTile(icon: Icons.directions, value: '${trip.days.where((d) => d.isTravelDay).length}', label: 'Travel Days', color: const Color(0xFFFFAB40))),
-            ],
-          ),
         ],
       ),
     );
   }
 
   Widget _buildBarSegment(double fraction, Color color) {
-    return Expanded(flex: (fraction * 100).round().clamp(1, 100), child: Container(height: 6, color: color));
+    return Expanded(
+      flex: (fraction * 100).round().clamp(1, 100),
+      child: Container(height: 6, color: color),
+    );
   }
 
   Widget _buildBarLegend(String label, Color color) {
     return Row(
-      mainAxisSize: MainAxisSize.min,
       children: [
-        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
         const SizedBox(width: 4),
-        Text(label, style: GoogleFonts.inter(color: Colors.white.withOpacity(0.8), fontSize: 11)),
+        Text(label, style: GoogleFonts.inter(color: Colors.white.withOpacity(0.7), fontSize: 11)),
       ],
-    );
-  }
-
-  Widget _buildInfoTile({required IconData icon, required String value, required String label, required Color color}) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFEEEEEE))),
-      child: Column(
-        children: [
-          Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: Icon(icon, size: 20, color: color)),
-          const SizedBox(height: 6),
-          Text(value, style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: color)),
-          Text(label, style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF888888))),
-        ],
-      ),
     );
   }
 
   Widget _buildSectionHeader(String title, IconData icon) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-      child: Row(children: [Icon(icon, size: 20, color: const Color(0xFF6C63FF)), const SizedBox(width: 8), Text(title, style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w700, color: const Color(0xFF1A1A2E)))]),
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: const Color(0xFF6C63FF)),
+          const SizedBox(width: 8),
+          Text(title, style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: const Color(0xFF1A1A2E))),
+        ],
+      ),
     );
   }
 
@@ -565,13 +632,122 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       delegate: SliverChildBuilderDelegate(
         (context, index) {
           final day = trip.days[index];
-          final isLast = index == trip.days.length - 1;
           final isExpanded = _expandedDayIndex == index;
-          return SlideTransition(
-            position: Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(CurvedAnimation(parent: _listAnimController, curve: Interval((index / trip.days.length) * 0.8, (index / trip.days.length) * 0.8 + 0.2, curve: Curves.easeOut))),
-            child: FadeTransition(
-              opacity: CurvedAnimation(parent: _listAnimController, curve: Interval((index / trip.days.length) * 0.8, (index / trip.days.length) * 0.8 + 0.2)),
-              child: _buildDayCard(context, day, index, isLast, isExpanded),
+
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: isExpanded ? const Color(0xFF6C63FF) : const Color(0xFFEEEEEE)),
+            ),
+            child: Column(
+              children: [
+                InkWell(
+                  onTap: () => setState(() {
+                    _expandedDayIndex = isExpanded ? null : index;
+                    _isEditing = false;
+                  }),
+                  borderRadius: BorderRadius.circular(14),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(color: day.color.withOpacity(0.1), shape: BoxShape.circle),
+                          child: Center(child: Text('${day.day}', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: day.color))),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(day.title, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: const Color(0xFF1A1A2E))),
+                              Text('${day.location} • ${day.date}', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF999999))),
+                            ],
+                          ),
+                        ),
+                        if (day.isTravelDay)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: Icon(Icons.flight, size: 14, color: const Color(0xFF6C63FF)),
+                          ),
+                        Icon(isExpanded ? Icons.expand_less : Icons.expand_more, size: 20, color: const Color(0xFFCCCCCC)),
+                      ],
+                    ),
+                  ),
+                ),
+                if (isExpanded) ...[
+                  const Divider(height: 1, color: Color(0xFFEEEEEE)),
+                  Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (!_isEditing) ...[
+                          Text(day.description, style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF555555), height: 1.5)),
+                          if (day.activities.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            ...day.activities.map((a) => Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.check_circle_outline, size: 12, color: Color(0xFF00BFA6)),
+                                  const SizedBox(width: 6),
+                                  Expanded(child: Text(a, style: const TextStyle(fontSize: 12))),
+                                ],
+                              ),
+                            )),
+                          ],
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              _buildSmallButton(Icons.edit, 'Edit', () => _startEditing(index)),
+                              const SizedBox(width: 8),
+                              _buildSmallButton(Icons.place, 'Places', () => Navigator.push(context, MaterialPageRoute(builder: (_) => PoiManagerScreen(
+                                trip: trip,
+                                dayNumber: day.day,
+                                onSave: (_) => setState(() {}),
+                              )))),
+                              const SizedBox(width: 8),
+                              _buildSmallButton(Icons.open_in_new, 'Details', () => Navigator.push(context, MaterialPageRoute(builder: (_) => DayDetailScreen(day: day, tripTitle: trip.title)))),
+                            ],
+                          ),
+                        ] else ...[
+                          // Inline editing UI
+                          TextField(controller: _editTitleController, decoration: const InputDecoration(labelText: 'Title', border: OutlineInputBorder())),
+                          const SizedBox(height: 8),
+                          TextField(controller: _editLocationController, decoration: const InputDecoration(labelText: 'Location', border: OutlineInputBorder())),
+                          const SizedBox(height: 8),
+                          TextField(controller: _editDescController, maxLines: 2, decoration: const InputDecoration(labelText: 'Description', border: OutlineInputBorder())),
+                          const SizedBox(height: 12),
+                          ..._activityControllers.asMap().entries.map((entry) => Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Row(
+                              children: [
+                                Expanded(child: TextField(controller: entry.value, decoration: const InputDecoration(labelText: 'Activity', border: OutlineInputBorder(), isDense: true))),
+                                IconButton(icon: const Icon(Icons.remove_circle, size: 18, color: Colors.red), onPressed: () => _removeActivityInline(entry.key)),
+                              ],
+                            ),
+                          )),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              TextButton.icon(onPressed: _addActivityInline, icon: const Icon(Icons.add, size: 16), label: const Text('Add')),
+                              const Spacer(),
+                              TextButton(onPressed: _cancelEditing, child: const Text('Cancel')),
+                              const SizedBox(width: 8),
+                              ElevatedButton(onPressed: _saveEditing, child: const Text('Save')),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ],
             ),
           );
         },
@@ -580,337 +756,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildDayCard(BuildContext context, TripDay day, int index, bool isLast, bool isExpanded) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: IntrinsicHeight(
+  Widget _buildSmallButton(IconData icon, String label, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0F0FF),
+          borderRadius: BorderRadius.circular(8),
+        ),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Timeline dot
-            SizedBox(
-              width: 50,
-              child: Column(
-                children: [
-                  if (index > 0) Expanded(child: Container(width: 2, color: const Color(0xFFE0E0E0))),
-                  if (index == 0) const Spacer(),
-                  GestureDetector(
-                    onTap: () {
-                      if (_isEditing) return;
-                      setState(() {
-                        _expandedDayIndex = _expandedDayIndex == index ? null : index;
-                      });
-                    },
-                    child: Container(
-                      width: 36, height: 36,
-                      decoration: BoxDecoration(
-                        color: day.color, shape: BoxShape.circle,
-                        boxShadow: [BoxShadow(color: day.color.withOpacity(0.4), blurRadius: 8, offset: const Offset(0, 2))],
-                      ),
-                      child: Center(child: Text('${day.day}', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13))),
-                    ),
-                  ),
-                  if (!isLast) Expanded(child: Container(width: 2, color: const Color(0xFFE0E0E0))),
-                  if (isLast) const Spacer(),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Card content
-            Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  if (_isEditing) return;
-                  setState(() {
-                    _expandedDayIndex = _expandedDayIndex == index ? null : index;
-                  });
-                },
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 12, offset: const Offset(0, 2))],
-                    border: isExpanded ? Border.all(color: day.color.withOpacity(0.3), width: 1.5) : null,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Always visible: header
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: day.color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: Icon(day.icon, size: 18, color: day.color)),
-                                const SizedBox(width: 10),
-                                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                  Text(day.title, style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: const Color(0xFF1A1A2E))),
-                                  Text('${day.date} · ${day.location}', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF888888))),
-                                ])),
-                                if (day.isTravelDay) Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: const Color(0xFF6C63FF).withOpacity(0.1), borderRadius: BorderRadius.circular(8)), child: Text('TRAVEL', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: const Color(0xFF6C63FF), letterSpacing: 0.5))),
-                                Icon(isExpanded ? Icons.expand_less : Icons.expand_more, size: 20, color: const Color(0xFFCCCCCC)),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(day.description, style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF555555), height: 1.4), maxLines: isExpanded ? null : 2, overflow: isExpanded ? null : TextOverflow.ellipsis),
-                          ],
-                        ),
-                      ),
-
-                      // Expanded: transportation section (replaces activities)
-                      if (isExpanded && !_isEditing) ...[
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Transportation section
-                              if (day.arrivalTransport != null || day.departureTransport != null) ...[
-                                Row(
-                                  children: [
-                                    const Icon(Icons.directions, size: 14, color: Color(0xFF6C63FF)),
-                                    const SizedBox(width: 6),
-                                    Text('Transportation', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF6C63FF))),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF8F9FE),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: const Color(0xFFEEEEEE)),
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      if (day.arrivalTransport != null)
-                                        _buildTransportRow('Arrival', day.arrivalTransport!),
-                                      if (day.arrivalTransport != null && day.departureTransport != null)
-                                        const Padding(padding: EdgeInsets.symmetric(vertical: 6), child: Divider(height: 1)),
-                                      if (day.departureTransport != null)
-                                        _buildTransportRow('Departure', day.departureTransport!),
-                                      if (day.transportDuration != null || day.transportCost != null) ...[
-                                        const Padding(padding: EdgeInsets.symmetric(vertical: 6), child: Divider(height: 1)),
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            if (day.transportDuration != null)
-                                              Row(children: [
-                                                const Icon(Icons.access_time, size: 12, color: Color(0xFF888888)),
-                                                const SizedBox(width: 4),
-                                                Text(day.transportDuration!, style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF666666))),
-                                              ]),
-                                            if (day.transportCost != null)
-                                              Text('${day.transportCost} $currency', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFF6C63FF))),
-                                          ],
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                              ],
-
-                              // Activities preview
-                              if (day.activities.isNotEmpty) ...[
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    const Icon(Icons.local_activity, size: 14, color: Color(0xFF00BFA6)),
-                                    const SizedBox(width: 6),
-                                    Text('Activities', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF00BFA6))),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                ...day.activities.take(3).map((a) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 4),
-                                  child: Row(children: [
-                                    Container(width: 4, height: 4, decoration: BoxDecoration(color: day.color.withOpacity(0.5), shape: BoxShape.circle)),
-                                    const SizedBox(width: 8),
-                                    Expanded(child: Text(a, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF555555)))),
-                                  ]),
-                                )),
-                                if (day.activities.length > 3)
-                                  Text('+${day.activities.length - 3} more', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF6C63FF), fontWeight: FontWeight.w600)),
-                              ],
-
-
-                            ],
-                          ),
-                        ),
-                        // Action buttons
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                          child: Row(
-                            children: [
-                              TextButton.icon(
-                                onPressed: () => _startEditing(index),
-                                icon: const Icon(Icons.edit, size: 14),
-                                label: Text('Edit', style: GoogleFonts.inter(fontSize: 12)),
-                                style: TextButton.styleFrom(foregroundColor: const Color(0xFF6C63FF), padding: const EdgeInsets.symmetric(horizontal: 8)),
-                              ),
-                              const SizedBox(width: 4),
-                              TextButton.icon(
-                                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DayDetailScreen(day: day, tripTitle: trip.title, currency: trip.currency))),
-                                icon: const Icon(Icons.open_in_new, size: 14),
-                                label: Text('Details', style: GoogleFonts.inter(fontSize: 12)),
-                                style: TextButton.styleFrom(foregroundColor: const Color(0xFF00BFA6), padding: const EdgeInsets.symmetric(horizontal: 8)),
-                              ),
-                              const SizedBox(width: 4),
-                              TextButton.icon(
-                                onPressed: () async {
-                                  final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => PoiManagerScreen(trip: trip, dayNumber: day.day, onSave: (updatedTrip) {
-                                    setState(() {
-                                      trip = updatedTrip;
-                                      _notifications = checkClosures(trip);
-                                    });
-                                  })));
-                                },
-                                icon: const Icon(Icons.place, size: 14),
-                                label: Text('Places', style: GoogleFonts.inter(fontSize: 12)),
-                                style: TextButton.styleFrom(foregroundColor: const Color(0xFFFFAB40), padding: const EdgeInsets.symmetric(horizontal: 8)),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-
-                      // Edit mode
-                      if (isExpanded && _isEditing) ...[
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              TextField(
-                                controller: _editTitleController,
-                                style: GoogleFonts.inter(fontSize: 14),
-                                decoration: InputDecoration(
-                                  labelText: 'Title', labelStyle: GoogleFonts.inter(fontSize: 12),
-                                  isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFEEEEEE))),
-                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF6C63FF))),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              TextField(
-                                controller: _editLocationController,
-                                style: GoogleFonts.inter(fontSize: 14),
-                                decoration: InputDecoration(
-                                  labelText: 'Location', labelStyle: GoogleFonts.inter(fontSize: 12),
-                                  isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFEEEEEE))),
-                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF6C63FF))),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              TextField(
-                                controller: _editDescController,
-                                maxLines: 2,
-                                style: GoogleFonts.inter(fontSize: 13),
-                                decoration: InputDecoration(
-                                  labelText: 'Description', labelStyle: GoogleFonts.inter(fontSize: 12),
-                                  isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFEEEEEE))),
-                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF6C63FF))),
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Text('Activities', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF888888))),
-                              const SizedBox(height: 6),
-                              ..._activityControllers.asMap().entries.map((entry) {
-                                final actIndex = entry.key;
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 6),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: TextField(
-                                          controller: entry.value,
-                                          decoration: InputDecoration(
-                                            isDense: true,
-                                            hintText: 'Activity name',
-                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFEEEEEE))),
-                                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                            suffixIcon: actIndex < _activityLocations.length && _activityLocations[actIndex] != null
-                                                ? const Icon(Icons.location_on, size: 14, color: Color(0xFF6C63FF))
-                                                : null,
-                                          ),
-                                          style: GoogleFonts.inter(fontSize: 13),
-                                        ),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.close, size: 16, color: Color(0xFFCCCCCC)),
-                                        onPressed: () => _removeActivityInline(actIndex),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }),
-                              TextButton.icon(
-                                onPressed: _addActivityInline,
-                                icon: const Icon(Icons.add, size: 16, color: Color(0xFF6C63FF)),
-                                label: Text('Add activity', style: GoogleFonts.inter(color: const Color(0xFF6C63FF), fontSize: 13)),
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  TextButton(
-                                    onPressed: _cancelEditing,
-                                    child: Text('Cancel', style: GoogleFonts.inter(color: const Color(0xFF999999))),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  ElevatedButton(
-                                    onPressed: _saveEditing,
-                                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                                    child: Text('Save', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ),
+            Icon(icon, size: 12, color: const Color(0xFF6C63FF)),
+            const SizedBox(width: 4),
+            Text(label, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF6C63FF))),
           ],
         ),
       ),
     );
   }
-
-  Widget _buildTransportRow(String label, TransportMode mode) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(color: getTransportColor(mode).withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-          child: Icon(getTransportIcon(mode), size: 14, color: getTransportColor(mode)),
-        ),
-        const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF999999))),
-            Text(getTransportLabel(mode), style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF333333))),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTransportChip(TransportMode mode, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: getTransportColor(mode).withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(getTransportIcon(mode), size: 12, color: getTransportColor(mode)), const SizedBox(width: 4), Text(label, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: getTransportColor(mode)))]),
-    );
-  }
-
 }
