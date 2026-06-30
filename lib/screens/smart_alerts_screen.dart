@@ -651,7 +651,7 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
 
   Widget _buildScheduleTab(List<Map<String, dynamic>> activities) {
     final config = _config;
-    final countryName = config?.country ?? widget.trip.days.first.country;
+    final countryName = config?.country ?? (widget.trip.days.isNotEmpty ? widget.trip.days.first.country : '');
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -671,6 +671,8 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
             status: ClosureStatus.info,
           );
         }),
+        // POI closure notifications per day
+        ..._buildPoiNotifications(),
         const SizedBox(height: 24),
         // Activities pricing section (if activities found)
         if (activities.isNotEmpty) ...[
@@ -710,6 +712,56 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
         const SizedBox(height: 40),
       ],
     );
+  }
+
+  // ─── POI Notifications ───────────────────────────────────────────
+
+  List<Widget> _buildPoiNotifications() {
+    final widgets = <Widget>[];
+    if (widget.trip.tripPois.isEmpty) return widgets;
+
+    for (final entry in widget.trip.tripPois) {
+      final dayNum = entry.dayNumber;
+      final dayDate = dayNum <= widget.trip.days.length ? widget.trip.days[dayNum - 1].date : '';
+      final dayLabel = 'Day $dayNum${dayDate.isNotEmpty ? ' ($dayDate)' : ''}';
+
+      // Check closure
+      final knownPoi = entry.poiId.startsWith('custom') ? null : PoiConfigs.getById(entry.poiId);
+      if (knownPoi != null) {
+        final notif = checkPoiClosure(entry, knownPoi, widget.trip.baseStartDate);
+        if (notif != null) {
+          widgets.add(_buildClosureCard(
+            venue: notif.poiName,
+            plannedDay: dayLabel,
+            issue: notif.message,
+            status: ClosureStatus.closed,
+          ));
+        }
+        // Best time hint
+        if (knownPoi.bestTime != null) {
+          widgets.add(_buildClosureCard(
+            venue: knownPoi.name,
+            plannedDay: dayLabel,
+            issue: 'Best visited in the ${knownPoi.bestTime}. ${knownPoi.notes ?? ""}'.trim(),
+            status: ClosureStatus.info,
+          ));
+        }
+      }
+
+      // Booking/price reminder
+      if (entry.requiresBooking) {
+        final priceStr = entry.typicalPriceOmr > 0
+            ? ' Entry fee: ${entry.typicalPriceOmr.toStringAsFixed(2)} OMR.'
+            : '';
+        widgets.add(_buildClosureCard(
+          venue: entry.name,
+          plannedDay: dayLabel,
+          issue: 'Booking/tickets required.$priceStr Reserve in advance.',
+          status: ClosureStatus.warning,
+        ));
+      }
+    }
+    return widgets;
   }
 
   // ─── New Card Builders ─────────────────────────────────────────────
