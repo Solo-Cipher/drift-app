@@ -24,9 +24,20 @@ class _SmartAlertsScreenState extends State<SmartAlertsScreen> {
   }
 
   CityConfig? _findConfig() {
+    if (widget.trip.days.isEmpty) return null;
+    // Match by comparing normalized country names (handle 'sri_lanka' vs 'Sri Lanka')
+    final tripCountry = widget.trip.days.first.country.toLowerCase().replaceAll('_', ' ').trim();
     for (final key in CityConfigs.availableCountries) {
       final c = CityConfigs.get(key);
-      if (widget.trip.days.any((d) => d.country.toLowerCase() == c.country.toLowerCase())) {
+      final configCountry = c.country.toLowerCase().replaceAll('_', ' ').trim();
+      if (tripCountry == configCountry) {
+        return c;
+      }
+    }
+    // Fallback: match by country key directly
+    for (final key in CityConfigs.availableCountries) {
+      final c = CityConfigs.get(key);
+      if (widget.trip.days.any((d) => d.country.toLowerCase().contains(key.replaceAll('_', ' ')))) {
         return c;
       }
     }
